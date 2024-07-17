@@ -1,0 +1,911 @@
+#!/usr/bin/env python3
+
+# (C) 2024  Roger Light <roger@atchoo.org>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+import struct
+import sys
+
+ansi_reset = "\u001b[0m"
+ansi_error = "\u001b[31;7m"
+ansi_red = "\u001b[31m"
+ansi_green = "\u001b[32m"
+ansi_yellow = "\u001b[33m"
+ansi_blue = "\u001b[34m"
+ansi_magenta = "\u001b[35m"
+ansi_cyan = "\u001b[36m"
+ansi_white = "\u001b[37m"
+ansi_br_black = "\u001b[90m"
+ansi_br_red = "\u001b[91m"
+ansi_br_green = "\u001b[92m"
+ansi_br_yellow = "\u001b[93m"
+ansi_br_blue = "\u001b[94m"
+ansi_br_magenta = "\u001b[95m"
+ansi_br_cyan = "\u001b[96m"
+ansi_br_white = "\u001b[97m"
+
+connack_strings = {
+    0: "accepted",
+    1: "refused: protocol version",
+    2: "refused: identifier rejected",
+    3: "refused: server unavailable",
+    4: "refused: bad username or password",
+    5: "refused: not authorized",
+}
+
+reason_code_strings = {
+    0: "success",
+    4: "disconnect with will message",
+    16: "no matching subscribers",
+    17: "no subscription existed",
+    24: "continue authentication",
+    25: "reauthenticate",
+    128: "unspecified",
+    129: "malformed packet",
+    130: "protocol error",
+    131: "implementation specific",
+    132: "unsupported protocol version",
+    133: "clientid not valid",
+    134: "bad username or password",
+    135: "not authorized",
+    136: "server unavailable",
+    137: "server busy",
+    138: "banned",
+    139: "server shutting down",
+    140: "bad authentication method",
+    141: "keep alive timeout",
+    142: "session taken over",
+    143: "topic filter invalid",
+    144: "topic name invalid",
+    145: "packet id in use",
+    146: "packet id not found",
+    147: "receive maximum exceeded",
+    148: "topic alias invalid",
+    149: "packet too large",
+    150: "message rate too high",
+    151: "quota exceeded",
+    152: "administrative action",
+    153: "payload format invalid",
+    154: "retain not supported",
+    155: "qos not supported",
+    156: "use another server",
+    157: "server moved",
+    158: "shared subscriptions not supported",
+    159: "connection rate exceeded",
+    160: "maximum connection time",
+    161: "subscription identifiers not supported",
+    162: "wildcard subscriptions not supported",
+}
+
+all_props = {
+   0x01: ("payload-format-indicator", "byte"),
+   0x02: ("message-expiry-interval", "uint32"),
+   0x03: ("content-type", "string"),
+   0x08: ("response-topic", "string"),
+   0x09: ("correlation-data", "string"),
+   0x0b: ("subscription-identifier", "varint"),
+   0x11: ("session-expiry-interval", "uint32"),
+   0x12: ("assigned-client-identifier", "string"),
+   0x13: ("server-keep-alive", "uint16"),
+   0x15: ("authentication-method", "string"),
+   0x16: ("authentication-data", "string"),
+   0x17: ("request-problem-information", "byte"),
+   0x18: ("will-delay-interval", "uint32"),
+   0x19: ("request-response-information", "byte"),
+   0x1a: ("response-information", "string"),
+   0x1c: ("server-reference", "string"),
+   0x1f: ("reason-string", "string"),
+   0x21: ("receive-maximum", "uint16"),
+   0x22: ("topic-alias-maximum", "uint16"),
+   0x23: ("topic-alias", "uint16"),
+   0x24: ("maximum-qos", "byte"),
+   0x25: ("retain-available", "byte"),
+   0x26: ("user-property", "stringpair"),
+   0x27: ("maximum-packet-size", "uint32"),
+   0x28: ("wildcard-subscription-available", "byte"),
+   0x29: ("subscription-identifier-available", "byte"),
+   0x2a: ("shared-subscription-available", "byte"),
+}
+
+# ============================================================
+# OUTPUT COLOURS
+# ============================================================
+topic_colour = ansi_br_yellow
+payload_colour = ansi_br_blue
+property_colour = ansi_br_blue
+clientid_colour = ansi_br_cyan
+keepalive_colour = ansi_br_cyan
+cleansession_colour = ansi_br_cyan
+protover_colour = ansi_br_cyan
+rc_colour = ansi_br_cyan
+mid_colour = ansi_br_cyan
+qos_colour = ansi_br_cyan
+username_colour = ansi_br_cyan
+password_colour = ansi_br_cyan
+retain_colour = ansi_br_cyan
+dup_colour = ansi_br_cyan
+sub_opt_colour = ansi_br_cyan
+rc_colour = ansi_br_cyan
+
+CONNECT_colour = ansi_yellow
+WILL_colour = ansi_br_blue
+PUBLISH0_colour = ansi_green
+PUBLISH1_colour = ansi_br_green
+PUBLISH2_colour = ansi_cyan
+SUBSCRIBE_colour = ansi_br_yellow
+UNSUBSCRIBE_colour = ansi_magenta
+PING_colour = ansi_br_black
+DISCONNECT_colour = ansi_blue
+AUTH_colour = ansi_br_magenta
+
+
+def decode_excess_bytes(rl, packet):
+    if rl == 0:
+        return packet
+    if packet is not None and len(packet) > 0:
+        print(f"Excess bytes:      {ansi_error}{packet[0:rl].hex()}{ansi_reset}")
+        return packet[rl:]
+    else:
+        return None
+
+
+def decode_byte(rl, packet):
+    if rl <= 0:
+        return f"{ansi_error}?{ansi_reset}", rl, packet
+    try:
+        byte = packet[0]
+        packet = packet[1:]
+    except (IndexError, TypeError):
+        byte = f"{ansi_error}?{ansi_reset}"
+    return byte, rl-1, packet
+
+
+def decode_uint16(rl, packet):
+    if rl <= 0:
+        return f"{ansi_error}?{ansi_reset}", rl, packet
+    try:
+        i16 = struct.unpack('!H', packet[0:2])[0]
+        packet = packet[2:]
+    except (IndexError, struct.error, TypeError):
+        i16 = f"{ansi_error}?{ansi_reset}"
+    return i16, rl-2, packet
+
+
+def decode_uint32(rl, packet):
+    if rl <= 0:
+        return f"{ansi_error}?{ansi_reset}", rl, packet
+    try:
+        i32 = struct.unpack('!I', packet[0:4])[0]
+        packet = packet[4:]
+    except (IndexError, struct.error):
+        i32 = f"{ansi_error}?{ansi_reset}"
+    return i32, rl-4, packet
+
+
+def decode_varint(rl, packet):
+    if rl <= 0:
+        return f"{ansi_error}?{ansi_reset}", rl, packet, 0
+    mult = 1
+    varint = 0
+    vl = 0
+    for i in range(0,4):
+        if rl <= 0:
+            return f"{ansi_error}?{ansi_reset}", rl, packet, vl
+        try:
+            byte = packet[0]
+            packet = packet[1:]
+        except IndexError:
+            varint = f"{ansi_error}?{ansi_reset}"
+            return (varint, rl, packet, vl)
+        rl -= 1
+
+        vl += 1
+        varint += (byte & 127) * mult
+        mult *= 128
+        if byte & 128 == 0:
+            break
+
+    return (varint, rl, packet, vl)
+
+
+def decode_string(rl, packet):
+    if isinstance(rl, str) or rl <= 0:
+        return f"{ansi_error}?{ansi_reset}", rl, packet
+    slen, rl, packet = decode_uint16(rl, packet)
+    if isinstance(slen, int):
+        if slen == 0:
+            return "", rl, packet
+        try:
+            slen = min(slen, rl)
+            s = struct.unpack(f'!{slen}s', packet[0:slen])[0]
+            rl -= len(s)
+            packet = packet[slen:]
+            s = s.decode('utf-8')
+            return s, rl, packet
+        except (IndexError, struct.error, UnicodeDecodeError):
+            s = f"{ansi_error}?{ansi_reset}"
+            return s, 0, None
+    else:
+        s = f"{ansi_error}?{ansi_reset}"
+        return s, 0, None
+
+
+def decode_properties(rl, packet):
+    if rl <= 0:
+        return rl, packet
+    if packet is None or len(packet) == 0:
+        return 0, None
+    pl, rl, packet, _ = decode_varint(rl, packet)
+    if pl > rl:
+        print(f"Properties Length: {ansi_error}{pl} > remaining length{ansi_reset}")
+        return rl, packet
+    else:
+        print(f"Properties Length: {pl}")
+    if not isinstance(pl, int):
+        return 0, None
+
+    while rl > 0 and pl > 0:
+        prop, rl, packet, vl = decode_varint(rl, packet)
+        pl -= vl
+
+        try:
+            propdef = all_props[prop]
+        except KeyError:
+            print(f"Property:          Unknown type: {ansi_error}{prop}{ansi_reset}")
+            return 0, None
+        print(f"Property:          {property_colour}{prop},{propdef[0]} = ", end="")
+        if propdef[1] == "byte":
+            v, rl, packet = decode_byte(rl, packet)
+            pl -= 1
+        elif propdef[1] == "uint16":
+            v, rl, packet = decode_uint16(rl, packet)
+            pl -= 2
+        elif propdef[1] == "uint32":
+            v, rl, packet = decode_uint32(rl, packet)
+            pl -= 4
+        elif propdef[1] == "varint":
+            v, rl, packet, vl = decode_varint(rl, packet)
+            pl -= vl
+        elif propdef[1] == "string":
+            v, rl, packet = decode_string(rl, packet)
+            pl -= (len(v) + 2)
+        elif propdef[1] == "stringpair":
+            k, rl, packet = decode_string(rl, packet)
+            v, rl, packet = decode_string(rl, packet)
+            pl -= (len(k) + 2 + len(v) + 2)
+            print(f"{k}:", end="")
+        print(f"{v}{ansi_reset}")
+    return rl, packet
+
+
+def decode_mid(rl, packet):
+    mid, rl, packet = decode_uint16(rl, packet)
+    if isinstance(mid, int) and mid > 0:
+        print(f"Packet ID:         {mid_colour}{mid}{ansi_reset}")
+    else:
+        print(f"Packet ID:         {ansi_error}{mid}{ansi_reset}")
+    return rl, packet
+
+
+def print_fixed_header(hdr, expected):
+    if hdr & 0x0F != expected:
+        print(f"Fixed header:      {ansi_error}0x{hdr:02x}{ansi_reset}")
+
+
+def print_length(rl, expected=-1):
+    if isinstance(rl, str):
+        print(f"Length:            {rl}")
+        exit(1)
+
+    if expected == -1 or rl == expected:
+        print(f"Length:            {rl}")
+    else:
+        print(f"Length:            {ansi_error}{rl}{ansi_reset}")
+
+
+def print_reason_code(rc):
+    try:
+        rc_str = reason_code_strings[rc]
+    except KeyError:
+        rc_str = f"{ansi_error}Invalid reason code{ansi_reset}"
+    print(f"Reason code:       {rc_colour}{rc} ({rc_str}){ansi_reset}")
+
+
+def decode_reason_code(rl, packet):
+    rc, rl, packet = decode_byte(rl, packet)
+    print_reason_code(rc)
+    return rl, packet
+
+
+def decode_reserved(rl, packet):
+    print(f"\n{ansi_error}RESERVED{ansi_reset}")
+    print_length(rl)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_connect_v34(cs_label, rl, packet):
+    flags, rl, packet = decode_byte(rl, packet)
+    username_flag = (flags & 0x80) == 0x80
+    password_flag = (flags & 0x40) == 0x40
+    will_retain = (flags & 0x20) == 0x20
+    will_qos = (flags & 0x18) >> 3
+    will_flag = (flags & 0x04) == 0x04
+    clean_session = (flags & 0x02) == 0x02
+    reserved = flags & 0x01
+
+    keepalive, rl, packet = decode_uint16(rl, packet)
+    clientid, rl, packet = decode_string(rl, packet)
+    if will_flag:
+        will_topic, rl, packet = decode_string(rl, packet)
+        will_message, rl, packet = decode_string(rl, packet)
+    if username_flag:
+        username, rl, packet = decode_string(rl, packet)
+    else:
+        username = None
+    if password_flag:
+        password, rl, packet = decode_string(rl, packet)
+    else:
+        password = None
+
+    print(f"Clean {cs_label}     {cleansession_colour}{clean_session}{ansi_reset}")
+    print(f"Keepalive:         {keepalive_colour}{keepalive}{ansi_reset}")
+    print(f"Client ID:         {clientid_colour}{clientid}{ansi_reset}")
+    if username is not None:
+        print(f"Username:          {username_colour}{username}{ansi_reset}")
+    if password is not None:
+        print(f"Password:          {password_colour}{password}{ansi_reset}")
+    if will_flag:
+        print("Will:")
+        print(f"  Topic:           {topic_colour}{will_topic}{ansi_reset}")
+        print(f"  QoS:             {qos_colour}{will_qos}{ansi_reset}")
+        print(f"  Retain:          {retain_colour}{will_retain}{ansi_reset}")
+        print(f"  Message:         {payload_colour}{will_message}{ansi_reset}")
+    if reserved:
+        print(f"Malformed connect flags: {ansi_error}{reserved}{ansi_reset}")
+
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_connect_v3(proto_name, rl_start, hdr, rl, packet):
+    print(f"\n{CONNECT_colour}CONNECT v3.1/v3.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl_start)
+    if proto_name != "MQIsdp":
+        print(f"Protocol name:     {ansi_error}{proto_name}{ansi_reset}")
+    return decode_connect_v34("start:  ", rl, packet)
+
+
+def decode_connect_v4(proto_name, rl_start, hdr, rl, packet):
+    print(f"\n{CONNECT_colour}CONNECT v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl_start)
+    if proto_name != "MQTT":
+        print(f"Protocol name:     {ansi_error}{proto_name}{ansi_reset}")
+    return decode_connect_v34("session:", rl, packet)
+
+
+def decode_connect_v5(proto_name, rl_start, hdr, rl, packet):
+    print(f"\n{CONNECT_colour}CONNECT v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl_start)
+    if proto_name != "MQTT":
+        print(f"Protocol name:     {ansi_error}{proto_name}{ansi_reset}")
+
+    flags, rl, packet = decode_byte(rl, packet)
+    username_flag = flags & 0x80
+    password_flag = flags & 0x40
+    will_retain = (flags & 0x20) == 0x20
+    will_qos = (flags & 0x18) >> 3
+    will_flag = flags & 0x04
+    clean_start = (flags & 0x02) == 0x02
+    reserved = flags & 0x01
+
+    keepalive, rl, packet = decode_uint16(rl, packet)
+    clientid, rl, packet = decode_string(rl, packet)
+    if will_flag:
+        will_topic, rl, packet = decode_string(rl, packet)
+        will_message, rl, packet = decode_string(rl, packet)
+    if username_flag:
+        username, rl, packet = decode_string(rl, packet)
+    else:
+        username = None
+    if password_flag:
+        password, rl, packet = decode_string(rl, packet)
+    else:
+        password = None
+
+    print(f"Clean start:       {cleansession_colour}{clean_start}{ansi_reset}")
+    print(f"Keepalive:         {keepalive_colour}{keepalive}{ansi_reset}")
+    print(f"Client ID:         {clientid_colour}{clientid}{ansi_reset}")
+    if username is not None:
+        print(f"Username:          {username_colour}{username}{ansi_reset}")
+    if password is not None:
+        print(f"Password:          {password_colour}{password}{ansi_reset}")
+    if will_flag:
+        print("Will:")
+        print(f"  Topic:           {topic_colour}{will_topic}{ansi_reset}")
+        print(f"  QoS:             {qos_colour}{will_qos}{ansi_reset}")
+        print(f"  Retain:          {retain_colour}{will_retain}{ansi_reset}")
+        print(f"  Message:         {payload_colour}{will_message}{ansi_reset}")
+    if reserved:
+        print(f"Malformed connect flags: {ansi_error}{reserved}{ansi_reset}")
+
+    rl, packet = decode_properties(rl, packet)
+    return decode_excess_bytes(rl, packet)
+
+
+
+def decode_connect_unknown(proto_name, proto_ver, rl_start, hdr, rl, packet):
+    print(f"\n{CONNECT_colour}CONNECT {ansi_error}unknown{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl_start)
+    print(f"Protocol name:     {proto_name}")
+    print(f"Protocol version:  {proto_ver}")
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_connect(hdr, rl, packet):
+    rl_start = rl
+    proto_name, rl, packet = decode_string(rl, packet)
+    proto_ver, rl, packet = decode_byte(rl, packet)
+
+    if proto_ver == 5:
+        return decode_connect_v5(proto_name, rl_start, hdr, rl, packet)
+    elif proto_ver == 4:
+        return decode_connect_v4(proto_name, rl_start, hdr, rl, packet)
+    elif proto_ver == 3:
+        return decode_connect_v3(proto_name, rl_start, hdr, rl, packet)
+    else:
+        return decode_connect_unknown(proto_name, proto_ver, rl_start, hdr, rl, packet)
+
+
+def decode_connack_v4(hdr, rl, packet):
+    print(f"\n{CONNECT_colour}CONNACK v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl)
+
+    resv, rl, packet = decode_byte(rl, packet)
+    if isinstance(resv, int):
+        print(f"Session present:   {(resv & 0x01) == 0x01}")
+        if resv & 0xFE:
+            print(f"Malformed connect acknowledge: {ansi_error}{resv}{ansi_reset}")
+    else:
+        print(f"Connect acknowledge: {resv}")
+
+    rc, rl, packet = decode_byte(rl, packet)
+    try:
+        rc_str = connack_strings[rc]
+    except KeyError:
+        rc_str = f"{ansi_error}Invalid return code{ansi_reset}"
+    print(f"Return code:       {rc_colour}{rc} ({rc_str}){ansi_reset}")
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_connack_v5(hdr, rl, packet):
+    print(f"\n{CONNECT_colour}CONNACK v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl)
+
+    resv, rl, packet = decode_byte(rl, packet)
+    if isinstance(resv, int):
+        print(f"Session present:   {(resv & 0x01) == 0x01}")
+        if resv & 0xFE:
+            print(f"Malformed connect acknowledge: {ansi_error}{resv}{ansi_reset}")
+    else:
+        print(f"Connect acknowledge: {resv}")
+
+    rc, rl, packet = decode_byte(rl, packet)
+    try:
+        rc_str = reason_code_strings[rc]
+    except KeyError:
+        rc_str = f"{ansi_error}Invalid reason code{ansi_reset}"
+    print(f"Reason code:       {rc_colour}{rc} ({rc_str}){ansi_reset}")
+    rl, packet = decode_properties(rl, packet)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_connack(hdr, rl, packet):
+    decode_connack_v4(hdr, rl, packet)
+    return decode_connack_v5(hdr, rl, packet)
+
+
+def decode_payload(rl, packet):
+    if rl <= 0 or packet is None:
+        print("Payload:")
+        return None
+
+    payload = struct.unpack(f"{rl}s", packet[0:rl])[0]
+    packet = packet[rl:]
+    try:
+        p = payload.decode('utf-8')
+    except UnicodeDecodeError:
+        p = payload.hex()
+    print(f"Payload:           {payload_colour}{p}{ansi_reset}")
+    return packet
+
+
+def decode_publish_v4(hdr, rl, packet):
+    if hdr & 0x01:
+        retain = "retain"
+    else:
+        retain = "no-retain"
+    qos = (hdr & 0x06) >> 1
+    if hdr & 0x08:
+        dup = "dup"
+    else:
+        dup = ""
+
+    if qos == 0:
+        col = PUBLISH0_colour
+    elif qos == 1:
+        col = PUBLISH1_colour
+    elif qos == 2:
+        col = PUBLISH2_colour
+    else:
+        col = PUBLISH0_colour
+        qos = f"{ansi_error}3{ansi_reset}"
+
+    print(f"\n{col}PUBLISH v3.1.1{ansi_reset}")
+    print_length(rl)
+
+    topic, rl, packet = decode_string(rl, packet)
+
+    print(f"Topic:             {topic_colour}{topic}{ansi_reset}")
+    print(f"QoS:               {qos_colour}{qos}{ansi_reset}")
+    print(f"Flags:             {retain_colour}{retain}{ansi_reset} {dup_colour}{dup}{ansi_reset}")
+    if qos == 1 or qos == 2:
+        rl, packet = decode_mid(rl, packet)
+
+    return decode_payload(rl, packet)
+
+
+def decode_publish_v5(hdr, rl, packet):
+    if hdr & 0x01:
+        retain = "retain"
+    else:
+        retain = "no-retain"
+    qos = (hdr & 0x06) >> 1
+    if hdr & 0x08:
+        dup = "dup"
+    else:
+        dup = ""
+
+    if qos == 0:
+        col = PUBLISH0_colour
+    elif qos == 1:
+        col = PUBLISH1_colour
+    elif qos == 2:
+        col = PUBLISH2_colour
+    else:
+        col = PUBLISH0_colour
+        qos = f"{ansi_error}3{ansi_reset}"
+
+    print(f"\n{col}PUBLISH v5.0{ansi_reset}")
+    print_length(rl)
+
+    topic, rl, packet = decode_string(rl, packet)
+
+    print(f"Topic:             {topic_colour}{topic}{ansi_reset}")
+    print(f"QoS:               {qos_colour}{qos}{ansi_reset}")
+    print(f"Flags:             {retain_colour}{retain}{ansi_reset} {dup_colour}{dup}{ansi_reset}")
+    if qos == 1 or qos == 2:
+        rl, packet = decode_mid(rl, packet)
+    rl, packet = decode_properties(rl, packet)
+
+    return decode_payload(rl, packet)
+
+
+def decode_publish(hdr, rl, packet):
+    decode_publish_v4(hdr, rl, packet)
+    return decode_publish_v5(hdr, rl, packet)
+
+
+def decode_pubflow_v5(rl, packet):
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    if len(packet) > 0:
+        rl, packet = decode_reason_code(rl, packet)
+    else:
+        decode_reason_code(0, bytes(0)) # implied success by omission
+    rl, packet = decode_properties(rl, packet)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_pubflow_v4(rl, packet):
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_puback(hdr, rl, packet):
+    print(f"\n{PUBLISH1_colour}PUBACK v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    decode_pubflow_v4(rl, packet)
+    print(f"\n{PUBLISH1_colour}PUBACK v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    return decode_pubflow_v5(rl, packet)
+
+
+def decode_pubrec(hdr, rl, packet):
+    print(f"\n{PUBLISH2_colour}PUBREC v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    decode_pubflow_v4(rl, packet)
+    print(f"\n{PUBLISH2_colour}PUBREC v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    return decode_pubflow_v5(rl, packet)
+
+
+def decode_pubrel(hdr, rl, packet):
+    print(f"\n{PUBLISH2_colour}PUBREL v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x02)
+    decode_pubflow_v4(rl, packet)
+    print(f"\n{PUBLISH2_colour}PUBREL v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x02)
+    return decode_pubflow_v5(rl, packet)
+
+
+def decode_pubcomp(hdr, rl, packet):
+    print(f"\n{PUBLISH2_colour}PUBCOMP v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    decode_pubflow_v4(rl, packet)
+    print(f"\n{PUBLISH2_colour}PUBCOMP v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    decode_pubflow_v4(rl, packet)
+    return decode_pubflow_v5(rl, packet)
+
+
+def decode_subscribe_v4(hdr, rl, packet):
+    print(f"\n{SUBSCRIBE_colour}SUBSCRIBE v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x02)
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    while rl > 0:
+        topic, rl, packet = decode_string(rl, packet)
+        qos, rl, packet = decode_byte(rl, packet)
+        if isinstance(qos, int) and qos > 2:
+            qos = f"{ansi_error}3{ansi_reset}"
+        print(f"Topic:             {topic_colour}{topic}{ansi_reset}")
+        print(f"  QoS:             {qos_colour}{qos}{ansi_reset}")
+
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_subscribe_v5(hdr, rl, packet):
+    print(f"\n{SUBSCRIBE_colour}SUBSCRIBE v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x02)
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    rl, packet = decode_properties(rl, packet)
+    while rl > 0:
+        topic, rl, packet = decode_string(rl, packet)
+        options, rl, packet = decode_byte(rl, packet)
+        if isinstance(options, int):
+            qos = options & 0x03
+            if qos == 3:
+                qos = f"{ansi_error}3{ansi_reset}"
+            print(f"Topic:             {topic_colour}{topic}{ansi_reset}")
+            print(f"  QoS:             {qos_colour}{qos}{ansi_reset}")
+            if options & 0x04:
+                print(f"  Flags:           {sub_opt_colour}no-local{ansi_reset}")
+            if options & 0x08:
+                print(f"  Flags:           {sub_opt_colour}retain-as-published{ansi_reset}")
+            retain_handling = options & 0x30
+            if retain_handling == 0x00:
+                print(f"  Flags:           {sub_opt_colour}send-retain-on-subscription{ansi_reset}")
+            elif retain_handling == 0x10:
+                print(f"  Flags:           {sub_opt_colour}send-retain-on-new-subscription{ansi_reset}")
+            elif retain_handling == 0x20:
+                print(f"  Flags:           {sub_opt_colour}send-retain-never{ansi_reset}")
+            else:
+                print(f"  Flags:           {ansi_error}send-retain-malformed{ansi_reset}")
+            if options & 0xC0:
+                print(f"  Flags:           {ansi_error}Subscription options malformed: {options:02x}{ansi_reset}")
+        else:
+            print(f"Topic:             {topic_colour}{topic}{ansi_reset}")
+            print(f"  Flags:           {ansi_error}Subscription options malformed: {options}{ansi_reset}")
+
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_subscribe(hdr, rl, packet):
+    decode_subscribe_v4(hdr, rl, packet)
+    return decode_subscribe_v5(hdr, rl, packet)
+
+
+def decode_suback_v4(hdr, rl, packet):
+    print(f"\n{SUBSCRIBE_colour}SUBACK v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    if packet is None or len(packet) == 0:
+        print(f"Granted Qos:       {ansi_error}?{ansi_reset}")
+    while rl > 0:
+        qos, rl, packet = decode_byte(rl, packet)
+        if isinstance(qos, int) and qos <= 2:
+            print(f"Granted QoS:       {qos_colour}{qos}{ansi_reset}")
+        else:
+            print(f"Granted QoS:       {ansi_error}{qos}{ansi_reset}")
+    return packet
+
+
+def decode_suback_v5(hdr, rl, packet):
+    print(f"\n{SUBSCRIBE_colour}SUBACK v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    rl, packet = decode_properties(rl, packet)
+    if packet is None or len(packet) == 0:
+        print(f"Reason code:       {ansi_error}?{ansi_reset}")
+    while rl > 0:
+        byte, rl, packet = decode_byte(rl, packet)
+        if isinstance(byte, int) and byte <= 2:
+            print(f"Reason code:       {byte}")
+        else:
+            print_reason_code(byte)
+    return packet
+
+
+def decode_suback(hdr, rl, packet):
+    decode_suback_v4(hdr, rl, packet)
+    return decode_suback_v5(hdr, rl, packet)
+
+
+def decode_unsubscribe_v4(hdr, rl, packet):
+    print(f"\n{SUBSCRIBE_colour}UNSUBSCRIBE v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x02)
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    while rl > 0:
+        topic, rl, packet = decode_string(rl, packet)
+        print(f"Topic:             {topic_colour}{topic}{ansi_reset}")
+
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_unsubscribe_v5(hdr, rl, packet):
+    print(f"\n{SUBSCRIBE_colour}UNSUBSCRIBE v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x02)
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    rl, packet = decode_properties(rl, packet)
+    while rl > 0:
+        topic, rl, packet = decode_string(rl, packet)
+        print(f"Topic:             {topic_colour}{topic}{ansi_reset}")
+
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_unsubscribe(hdr, rl, packet):
+    decode_unsubscribe_v4(hdr, rl, packet)
+    return decode_unsubscribe_v5(hdr, rl, packet)
+
+
+def decode_unsuback_v4(hdr, rl, packet):
+    print(f"\n{UNSUBSCRIBE_colour}UNSUBACK v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_unsuback_v5(hdr, rl, packet):
+    print(f"\n{UNSUBSCRIBE_colour}UNSUBACK v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl)
+    rl, packet = decode_mid(rl, packet)
+    rl, packet = decode_properties(rl, packet)
+    while rl > 0:
+        rl, packet = decode_reason_code(rl, packet)
+    return packet
+
+
+def decode_unsuback(hdr, rl, packet):
+    decode_unsuback_v4(hdr, rl, packet)
+    return decode_unsuback_v5(hdr, rl, packet)
+
+
+def decode_ping(label, hdr, rl, packet):
+    print(f"\n{PING_colour}{label} v3.1.1/v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl, 0)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_pingreq(hdr, rl, packet):
+    return decode_ping("PINGREQ", hdr, rl, packet)
+
+
+def decode_pingresp(hdr, rl, packet):
+    return decode_ping("PINGRESP", hdr, rl, packet)
+
+
+def decode_disconnect_v4(hdr, rl, packet):
+    print(f"\n{DISCONNECT_colour}DISCONNECT v3.1.1{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl, 0)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_disconnect_v5(hdr, rl, packet):
+    print(f"\n{DISCONNECT_colour}DISCONNECT v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl)
+    rl, packet = decode_reason_code(rl, packet)
+    rl, packet = decode_properties(rl, packet)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_disconnect(hdr, rl, packet):
+    decode_disconnect_v4(hdr, rl, packet)
+    return decode_disconnect_v5(hdr, rl, packet)
+
+
+def decode_auth(hdr, rl, packet):
+    print(f"\n{AUTH_colour}AUTH v5.0{ansi_reset}")
+    print_fixed_header(hdr, 0x00)
+    print_length(rl)
+    rl, packet = decode_reason_code(rl, packet)
+    rl, packet = decode_properties(rl, packet)
+    return decode_excess_bytes(rl, packet)
+
+
+def decode_packet(packet):
+    hdr, packet = struct.unpack("!B%ds" % (len(packet)-1), bytes(packet))
+    rl, _, packet, _ = decode_varint(100, packet)
+
+    cmd = hdr & 0xF0
+    if cmd == 0x00:
+        packet = decode_reserved(rl, packet)
+    elif cmd == 0x10:
+        packet = decode_connect(hdr, rl, packet)
+    elif cmd == 0x20:
+        packet = decode_connack(hdr, rl, packet)
+    elif cmd == 0x30:
+        packet = decode_publish(hdr, rl, packet)
+    elif cmd == 0x40:
+        packet = decode_puback(hdr, rl, packet)
+    elif cmd == 0x50:
+        packet = decode_pubrec(hdr, rl, packet)
+    elif cmd == 0x60:
+        packet = decode_pubrel(hdr, rl, packet)
+    elif cmd == 0x70:
+        packet = decode_pubcomp(hdr, rl, packet)
+    elif cmd == 0x80:
+        packet = decode_subscribe(hdr, rl, packet)
+    elif cmd == 0x90:
+        packet = decode_suback(hdr, rl, packet)
+    elif cmd == 0xA0:
+        packet = decode_unsubscribe(hdr, rl, packet)
+    elif cmd == 0xB0:
+        packet = decode_unsuback(hdr, rl, packet)
+    elif cmd == 0xC0:
+        packet = decode_pingreq(hdr, rl, packet)
+    elif cmd == 0xD0:
+        packet = decode_pingresp(hdr, rl, packet)
+    elif cmd == 0xE0:
+        packet = decode_disconnect(hdr, rl, packet)
+    elif cmd == 0xF0:
+        packet = decode_auth(hdr, rl, packet)
+    return packet
+
+def mqttdecode(hexstring):
+    packet = bytes.fromhex(hexstring)
+    while packet is not None and len(packet) > 0:
+        packet = decode_packet(packet)
+        if packet is not None and len(packet) > 0:
+            print("\n------------------------------")
+
+if len(sys.argv) > 1:
+    mqttdecode("".join(sys.argv[1:]))
