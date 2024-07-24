@@ -152,7 +152,11 @@ class mqttdecode():
         pass
 
     def decode(self, hexstring):
-        self._packet = bytes.fromhex(hexstring)
+        try:
+            self._packet = bytes.fromhex(hexstring)
+        except ValueError:
+            print(f"Input is not valid hex: {hexstring}")
+            return
         while self._packet is not None and len(self._packet) > 0:
             cur_packet = self._packet
             self._decode_packet()
