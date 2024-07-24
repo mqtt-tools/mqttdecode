@@ -121,37 +121,44 @@ all_props = {
    0x2a: ("shared-subscription-available", "byte"),
 }
 
-# ============================================================
-# OUTPUT COLOURS
-# ============================================================
-length_colour = ansi_br_magenta
-topic_colour = ansi_br_yellow
-payload_colour = ansi_br_blue
-property_colour = ansi_br_blue
-clientid_colour = ansi_br_cyan
-keepalive_colour = ansi_br_cyan
-cleansession_colour = ansi_br_cyan
-protover_colour = ansi_br_cyan
-rc_colour = ansi_br_cyan
-mid_colour = ansi_br_cyan
-qos_colour = ansi_br_cyan
-username_colour = ansi_br_cyan
-password_colour = ansi_br_cyan
-retain_colour = ansi_br_cyan
-dup_colour = ansi_br_cyan
-sub_opt_colour = ansi_br_cyan
-rc_colour = ansi_br_cyan
-string_length_colour = ansi_br_yellow2
+class COLOURS():
+    def __init__(self, colourful):
+        self._colourful = colourful
+        self._colours = {
+            'cleansession': ansi_br_cyan,
+            'clientid': ansi_br_cyan,
+            'command': ansi_yellow,
+            'dup': ansi_br_cyan,
+            'error': ansi_error,
+            'keepalive': ansi_br_cyan,
+            'length': ansi_br_magenta,
+            'mid': ansi_br_cyan,
+            'password': ansi_br_cyan,
+            'payload': ansi_br_blue,
+            'property': ansi_br_blue,
+            'protover': ansi_br_cyan,
+            'qos': ansi_br_cyan,
+            'rc': ansi_br_cyan,
+            'reset': ansi_reset,
+            'retain': ansi_br_cyan,
+            'strlen': ansi_br_yellow2,
+            'subopt': ansi_br_cyan,
+            'topic': ansi_br_yellow,
+            'username': ansi_br_cyan,
+            'will': ansi_br_blue,
+        }
 
-COMMAND_colour = ansi_yellow
-WILL_colour = ansi_br_blue
-
-errstr = f"{ansi_error}?{ansi_reset}"
+    def __getitem__(self, key):
+        if self._colourful:
+            return self._colours[key]
+        else:
+            return ""
 
 class mqttdecode():
     def __init__(self, args):
         self.args = args
-        pass
+        self.cols = COLOURS(not args.no_colour)
+        self.errstr = f"{self.cols['error']}?{self.cols['reset']}"
 
     def decode(self, hexstring):
         try:
@@ -190,8 +197,8 @@ class mqttdecode():
         if self._rl == 0:
             return
         if self._packet is not None and len(self._packet) > 0:
-            self._output_text += f"Excess bytes:      {ansi_error}{self._packet[0:self._rl].hex()}{ansi_reset}\n"
-            self._output_hex += f"{ansi_error}{self._packet[0:self._rl].hex()}{ansi_reset}"
+            self._output_text += f"Excess bytes:      {self.cols['error']}{self._packet[0:self._rl].hex()}{self.cols['reset']}\n"
+            self._output_hex += f"{self.cols['error']}{self._packet[0:self._rl].hex()}{self.cols['reset']}"
             self._packet = self._packet[self._rl:]
         self._rl = 0
 
@@ -210,13 +217,13 @@ class mqttdecode():
 
     def _decode_byte(self, col):
         if self._rl <= 0:
-            return errstr
+            return self.errstr
         try:
             byte = self._packet[0]
-            self._output_hex += f"{col}{byte:02x}{ansi_reset} "
+            self._output_hex += f"{col}{byte:02x}{self.cols['reset']} "
             self._packet = self._packet[1:]
         except (IndexError, TypeError):
-            byte = errstr
+            byte = self.errstr
             if len(self._packet) < 1:
                 self._packet = None
         self._rl -= 1
@@ -225,13 +232,13 @@ class mqttdecode():
 
     def _decode_uint16(self, col):
         if self._rl <= 0:
-            return errstr
+            return self.errstr
         try:
             i16 = struct.unpack('!H', self._packet[0:2])[0]
-            self._output_hex += f"{col}{self._packet[0:2].hex()}{ansi_reset} "
+            self._output_hex += f"{col}{self._packet[0:2].hex()}{self.cols['reset']} "
             self._packet = self._packet[2:]
         except (IndexError, struct.error, TypeError):
-            i16 = errstr
+            i16 = self.errstr
             if len(self._packet) < 2:
                 self._packet = None
         self._rl -= 2
@@ -240,13 +247,13 @@ class mqttdecode():
 
     def _decode_uint32(self, col):
         if self._rl <= 0:
-            return errstr
+            return self.errstr
         try:
             i32 = struct.unpack('!I', self._packet[0:4])[0]
-            self._output_hex += f"{col}{self._packet[0:4].hex()}{ansi_reset} "
+            self._output_hex += f"{col}{self._packet[0:4].hex()}{self.cols['reset']} "
             self._packet = self._packet[4:]
         except (IndexError, struct.error):
-            i32 = errstr
+            i32 = self.errstr
             if len(self._packet) < 4:
                 self._packet = None
         self._rl -= 4
@@ -255,19 +262,19 @@ class mqttdecode():
 
     def _decode_varint(self, col):
         if self._rl <= 0:
-            return errstr, 0
+            return self.errstr, 0
         mult = 1
         varint = 0
         vl = 0
         for i in range(0,4):
             if self._rl <= 0:
-                return errstr, vl
+                return self.errstr, vl
             try:
                 byte = self._packet[0]
                 self._packet = self._packet[1:]
-                self._output_hex += f"{col}{byte:02x}{ansi_reset} "
+                self._output_hex += f"{col}{byte:02x}{self.cols['reset']} "
             except IndexError:
-                varint = errstr
+                varint = self.errstr
                 return (varint, vl)
             self._rl -= 1
 
@@ -282,25 +289,25 @@ class mqttdecode():
 
     def _decode_string(self, col):
         if isinstance(self._rl, str) or self._rl <= 0:
-            return errstr, errstr
-        slen_full = self._decode_uint16(string_length_colour)
+            return self.errstr, self.errstr
+        slen_full = self._decode_uint16(self.cols['strlen'])
         if isinstance(slen_full, int):
             if slen_full == 0:
                 return "", 0
             try:
                 slen = min(slen_full, self._rl)
                 s = struct.unpack(f'!{slen}s', self._packet[0:slen])[0]
-                self._output_hex += f"{col}{self._packet[0:slen].hex()}{ansi_reset} "
+                self._output_hex += f"{col}{self._packet[0:slen].hex()}{self.cols['reset']} "
                 self._rl -= slen
                 self._packet = self._packet[slen:]
                 s = s.decode('utf-8')
                 if slen < slen_full:
-                    s += errstr
+                    s += self.errstr
                 return s, slen_full
             except (IndexError, struct.error, UnicodeDecodeError):
-                return errstr, errstr
+                return self.errstr, self.errstr
         else:
-            return errstr, errstr
+            return self.errstr, self.errstr
 
 
     def _decode_properties(self):
@@ -308,9 +315,9 @@ class mqttdecode():
             return
         if self._packet is None or len(self._packet) == 0:
             return
-        pl, _ = self._decode_varint(property_colour)
+        pl, _ = self._decode_varint(self.cols['property'])
         if pl > self._rl:
-            self._output_text += f"Properties Length: {ansi_error}{pl} > remaining length{ansi_reset}\n"
+            self._output_text += f"Properties Length: {self.cols['error']}{pl} > remaining length{self.cols['reset']}\n"
             return
         else:
             self._output_text += f"Properties Length: {pl}\n"
@@ -318,85 +325,85 @@ class mqttdecode():
             return
 
         while self._rl > 0 and pl > 0:
-            prop, vl = self._decode_varint(property_colour)
+            prop, vl = self._decode_varint(self.cols['property'])
             pl -= vl
 
             try:
                 propdef = all_props[prop]
             except KeyError:
-                self._output_text += f"Property:          Unknown type: {ansi_error}{prop}{ansi_reset}\n"
+                self._output_text += f"Property:          Unknown type: {self.cols['error']}{prop}{self.cols['reset']}\n"
                 return 0, None
-            self._output_text += f"Property:          {property_colour}{prop},{propdef[0]} = "
+            self._output_text += f"Property:          {self.cols['property']}{prop},{propdef[0]} = "
             if propdef[1] == "byte":
-                v = self._decode_byte(property_colour)
+                v = self._decode_byte(self.cols['property'])
                 pl -= 1
             elif propdef[1] == "uint16":
-                v = self._decode_uint16(property_colour)
+                v = self._decode_uint16(self.cols['property'])
                 pl -= 2
             elif propdef[1] == "uint32":
-                v = self._decode_uint32(property_colour)
+                v = self._decode_uint32(self.cols['property'])
                 pl -= 4
             elif propdef[1] == "varint":
-                v, vl = self._decode_varint(property_colour)
+                v, vl = self._decode_varint(self.cols['property'])
                 pl -= vl
             elif propdef[1] == "string":
-                v, _ = self._decode_string(property_colour)
+                v, _ = self._decode_string(self.cols['property'])
                 pl -= (len(v) + 2)
             elif propdef[1] == "stringpair":
-                k, _ = self._decode_string(property_colour)
-                v, _ = self._decode_string(property_colour)
+                k, _ = self._decode_string(self.cols['property'])
+                v, _ = self._decode_string(self.cols['property'])
                 pl -= (len(k) + 2 + len(v) + 2)
                 self._output_text += f"{k}:"
-            self._output_text += f"{v}{ansi_reset}\n"
+            self._output_text += f"{v}{self.cols['reset']}\n"
 
 
     def _decode_mid(self):
-        mid = self._decode_uint16(mid_colour)
+        mid = self._decode_uint16(self.cols['mid'])
         if isinstance(mid, int) and mid > 0:
-            self._output_text += f"Packet ID:         {mid_colour}{mid}{ansi_reset}\n"
+            self._output_text += f"Packet ID:         {self.cols['mid']}{mid}{self.cols['reset']}\n"
         else:
-            self._output_text += f"Packet ID:         {ansi_error}{mid}{ansi_reset}\n"
+            self._output_text += f"Packet ID:         {self.cols['error']}{mid}{self.cols['reset']}\n"
 
 
     def _print_fixed_header(self, expected):
         if self._hdr & 0x0F != expected:
-            self._output_text += f"Fixed header:      {ansi_error}0x{self._hdr:02x}{ansi_reset}\n"
+            self._output_text += f"Fixed header:      {self.cols['error']}0x{self._hdr:02x}{self.cols['reset']}\n"
 
 
     def _print_length(self, rl, expected=-1):
         if isinstance(rl, str):
-            self._output_text += f"Length:            {length_colour}{rl}{ansi_reset}\n"
+            self._output_text += f"Length:            {self.cols['length']}{rl}{self.cols['reset']}\n"
             exit(1)
 
         if expected == -1 or rl == expected:
-            self._output_text += f"Length:            {length_colour}{rl}{ansi_reset}\n"
+            self._output_text += f"Length:            {self.cols['length']}{rl}{self.cols['reset']}\n"
         else:
-            self._output_text += f"Length:            {ansi_error}{rl}{ansi_reset}\n"
+            self._output_text += f"Length:            {self.cols['error']}{rl}{self.cols['reset']}\n"
 
 
     def _print_reason_code(self, rc):
         try:
             rc_str = reason_code_strings[rc]
         except KeyError:
-            rc_str = f"{ansi_error}Invalid reason code{ansi_reset}"
-        self._output_text += f"Reason code:       {rc_colour}{rc} ({rc_str}){ansi_reset}\n"
+            rc_str = f"{self.cols['error']}Invalid reason code{self.cols['reset']}"
+        self._output_text += f"Reason code:       {self.cols['rc']}{rc} ({rc_str}){self.cols['reset']}\n"
 
 
     def _decode_reason_code(self):
-        rc = self._decode_byte(rc_colour)
+        rc = self._decode_byte(self.cols['rc'])
         self._print_reason_code(rc)
 
 
     def _decode_reserved(self):
-        self._output_text += f"Command:           {ansi_error}RESERVED{ansi_reset}\n"
-        self._output_hex = f"{ansi_error}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['error']}RESERVED{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['error']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_length(self._rl)
         self._decode_excess_bytes()
         self._get_output_v4()
 
 
     def _decode_connect_v34(self, cs_label):
-        flags = self._decode_byte(cleansession_colour)
+        flags = self._decode_byte(self.cols['cleansession'])
         if isinstance(flags, str):
             return
         username_flag = (flags & 0x80) == 0x80
@@ -407,65 +414,65 @@ class mqttdecode():
         clean_session = (flags & 0x02) == 0x02
         reserved = flags & 0x01
 
-        keepalive = self._decode_uint16(keepalive_colour)
-        clientid, clientid_len = self._decode_string(clientid_colour)
+        keepalive = self._decode_uint16(self.cols['keepalive'])
+        clientid, clientid_len = self._decode_string(self.cols['clientid'])
         if will_flag:
-            will_topic, will_topic_len = self._decode_string(WILL_colour)
-            will_message, will_message_len = self._decode_string(WILL_colour)
+            will_topic, will_topic_len = self._decode_string(self.cols['will'])
+            will_message, will_message_len = self._decode_string(self.cols['will'])
         if username_flag:
-            username, username_len = self._decode_string(username_colour)
+            username, username_len = self._decode_string(self.cols['username'])
         else:
             username = None
         if password_flag:
-            password, password_len = self._decode_string(password_colour)
+            password, password_len = self._decode_string(self.cols['password'])
         else:
             password = None
 
-        self._output_text += f"Clean {cs_label}     {cleansession_colour}{clean_session}{ansi_reset}\n"
-        self._output_text += f"Keepalive:         {keepalive_colour}{keepalive}{ansi_reset}\n"
-        self._output_text += f"Client ID:         ({string_length_colour}length: {clientid_len}{ansi_reset}) {clientid_colour}{clientid}{ansi_reset}\n"
+        self._output_text += f"Clean {cs_label}     {self.cols['cleansession']}{clean_session}{self.cols['reset']}\n"
+        self._output_text += f"Keepalive:         {self.cols['keepalive']}{keepalive}{self.cols['reset']}\n"
+        self._output_text += f"Client ID:         ({self.cols['strlen']}length: {clientid_len}{self.cols['reset']}) {self.cols['clientid']}{clientid}{self.cols['reset']}\n"
         if username is not None:
-            self._output_text += f"Username:          ({string_length_colour}length: {username_len}{ansi_reset}) {username_colour}{username}{ansi_reset}\n"
+            self._output_text += f"Username:          ({self.cols['strlen']}length: {username_len}{self.cols['reset']}) {self.cols['username']}{username}{self.cols['reset']}\n"
         if password is not None:
-            self._output_text += f"Password:          ({string_length_colour}length: {password_len}{ansi_reset}) {password_colour}{password}{ansi_reset}\n"
+            self._output_text += f"Password:          ({self.cols['strlen']}length: {password_len}{self.cols['reset']}) {self.cols['password']}{password}{self.cols['reset']}\n"
         if will_flag:
             self._output_text += "Will:\n"
-            self._output_text += f"  Topic:           ({string_length_colour}{will_topic_len}{ansi_reset}) {topic_colour}{will_topic}{ansi_reset}\n"
-            self._output_text += f"  QoS:             {qos_colour}{will_qos}{ansi_reset}\n"
-            self._output_text += f"  Retain:          {retain_colour}{will_retain}{ansi_reset}\n"
-            self._output_text += f"  Message:         ({string_length_colour}{will_message_len}{ansi_reset}) {payload_colour}{will_message}{ansi_reset}\n"
+            self._output_text += f"  Topic:           ({self.cols['strlen']}{will_topic_len}{self.cols['reset']}) {self.cols['topic']}{will_topic}{self.cols['reset']}\n"
+            self._output_text += f"  QoS:             {self.cols['qos']}{will_qos}{self.cols['reset']}\n"
+            self._output_text += f"  Retain:          {self.cols['retain']}{will_retain}{self.cols['reset']}\n"
+            self._output_text += f"  Message:         ({self.cols['strlen']}{will_message_len}{self.cols['reset']}) {self.cols['payload']}{will_message}{self.cols['reset']}\n"
         if reserved:
-            self._output_text += f"Malformed connect flags: {ansi_error}{reserved}{ansi_reset}\n"
+            self._output_text += f"Malformed connect flags: {self.cols['error']}{reserved}{self.cols['reset']}\n"
 
         self._decode_excess_bytes()
 
 
     def _decode_connect_v3(self, proto_name, rl_start):
-        self._output_text += f"Command:           {COMMAND_colour}CONNECT v3.1/v3.0{ansi_reset}\n"
+        self._output_text += f"Command:           {self.cols['command']}CONNECT v3.1/v3.0{self.cols['reset']}\n"
         self._print_fixed_header(0x00)
         self._print_length(rl_start)
         if proto_name != "MQIsdp":
-            self._output_text += f"Protocol name:     {ansi_error}{proto_name}{ansi_reset}\n"
+            self._output_text += f"Protocol name:     {self.cols['error']}{proto_name}{self.cols['reset']}\n"
         self._decode_connect_v34("start:  ")
 
 
     def _decode_connect_v4(self, proto_name, rl_start):
-        self._output_text += f"Command:           {COMMAND_colour}CONNECT v3.1.1{ansi_reset}\n"
+        self._output_text += f"Command:           {self.cols['command']}CONNECT v3.1.1{self.cols['reset']}\n"
         self._print_fixed_header(0x00)
         self._print_length(rl_start)
         if proto_name != "MQTT":
-            self._output_text += f"Protocol name:     {ansi_error}{proto_name}{ansi_reset}\n"
+            self._output_text += f"Protocol name:     {self.cols['error']}{proto_name}{self.cols['reset']}\n"
         self._decode_connect_v34("session:")
 
 
     def _decode_connect_v5(self, proto_name, rl_start):
-        self._output_text += f"Command:           {COMMAND_colour}CONNECT v5.0{ansi_reset}\n"
+        self._output_text += f"Command:           {self.cols['command']}CONNECT v5.0{self.cols['reset']}\n"
         self._print_fixed_header(0x00)
         self._print_length(rl_start)
         if proto_name != "MQTT":
-            self._output_text += f"Protocol name:     {ansi_error}{proto_name}{ansi_reset}\n"
+            self._output_text += f"Protocol name:     {self.cols['error']}{proto_name}{self.cols['reset']}\n"
 
-        flags = self._decode_byte(cleansession_colour)
+        flags = self._decode_byte(self.cols['cleansession'])
         username_flag = flags & 0x80
         password_flag = flags & 0x40
         will_retain = (flags & 0x20) == 0x20
@@ -474,35 +481,35 @@ class mqttdecode():
         clean_start = (flags & 0x02) == 0x02
         reserved = flags & 0x01
 
-        keepalive = self._decode_uint16(keepalive_colour)
-        clientid, clientid_len = self._decode_string(clientid_colour)
+        keepalive = self._decode_uint16(self.cols['keepalive'])
+        clientid, clientid_len = self._decode_string(self.cols['clientid'])
         if will_flag:
-            will_topic, will_topic_len = self._decode_string(WILL_colour)
-            will_message, will_message_len = self._decode_string(WILL_colour)
+            will_topic, will_topic_len = self._decode_string(self.cols['will'])
+            will_message, will_message_len = self._decode_string(self.cols['will'])
         if username_flag:
-            username, username_len = self._decode_string(username_colour)
+            username, username_len = self._decode_string(self.cols['username'])
         else:
             username = None
         if password_flag:
-            password, password_len = self._decode_string(password_colour)
+            password, password_len = self._decode_string(self.cols['password'])
         else:
             password = None
 
-        self._output_text += f"Clean start:       {cleansession_colour}{clean_start}{ansi_reset}\n"
-        self._output_text += f"Keepalive:         {keepalive_colour}{keepalive}{ansi_reset}\n"
-        self._output_text += f"Client ID:         ({string_length_colour}length: {clientid_len}{ansi_reset}) {clientid_colour}{clientid}{ansi_reset}\n"
+        self._output_text += f"Clean start:       {self.cols['cleansession']}{clean_start}{self.cols['reset']}\n"
+        self._output_text += f"Keepalive:         {self.cols['keepalive']}{keepalive}{self.cols['reset']}\n"
+        self._output_text += f"Client ID:         ({self.cols['strlen']}length: {clientid_len}{self.cols['reset']}) {self.cols['clientid']}{clientid}{self.cols['reset']}\n"
         if username is not None:
-            self._output_text += f"Username:          ({string_length_colour}length: {username_len}{ansi_reset}) {username_colour}{username}{ansi_reset}\n"
+            self._output_text += f"Username:          ({self.cols['strlen']}length: {username_len}{self.cols['reset']}) {self.cols['username']}{username}{self.cols['reset']}\n"
         if password is not None:
-            self._output_text += f"Password:          ({string_length_colour}length: {password_len}{ansi_reset}) {password_colour}{password}{ansi_reset}\n"
+            self._output_text += f"Password:          ({self.cols['strlen']}length: {password_len}{self.cols['reset']}) {self.cols['password']}{password}{self.cols['reset']}\n"
         if will_flag:
             self._output_text += "Will:\n"
-            self._output_text += f"  Topic:           ({string_length_colour}{will_topic_len}{ansi_reset}) {topic_colour}{will_topic}{ansi_reset}\n"
-            self._output_text += f"  QoS:             {qos_colour}{will_qos}{ansi_reset}\n"
-            self._output_text += f"  Retain:          {retain_colour}{will_retain}{ansi_reset}\n"
-            self._output_text += f"  Message:         ({string_length_colour}{will_message_len}{ansi_reset}) {payload_colour}{will_message}{ansi_reset}\n"
+            self._output_text += f"  Topic:           ({self.cols['strlen']}{will_topic_len}{self.cols['reset']}) {self.cols['topic']}{will_topic}{self.cols['reset']}\n"
+            self._output_text += f"  QoS:             {self.cols['qos']}{will_qos}{self.cols['reset']}\n"
+            self._output_text += f"  Retain:          {self.cols['retain']}{will_retain}{self.cols['reset']}\n"
+            self._output_text += f"  Message:         ({self.cols['strlen']}{will_message_len}{self.cols['reset']}) {self.cols['payload']}{will_message}{self.cols['reset']}\n"
         if reserved:
-            self._output_text += f"Malformed connect flags: {ansi_error}{reserved}{ansi_reset}\n"
+            self._output_text += f"Malformed connect flags: {self.cols['error']}{reserved}{self.cols['reset']}\n"
 
         self._decode_properties()
         self._decode_excess_bytes()
@@ -510,7 +517,7 @@ class mqttdecode():
 
 
     def _decode_connect_unknown(self, proto_name, proto_ver, rl_start):
-        self._output_text += f"Command:           {COMMAND_colour}CONNECT {ansi_error}unknown{ansi_reset}\n"
+        self._output_text += f"Command:           {self.cols['command']}CONNECT {self.cols['error']}unknown{self.cols['reset']}\n"
         self._print_fixed_header(0x00)
         self._print_length(rl_start)
         self._output_text += f"Protocol name:     {proto_name}\n"
@@ -519,7 +526,7 @@ class mqttdecode():
 
 
     def _decode_connect(self):
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         rl_start = self._rl
         proto_name, _ = self._decode_string(ansi_br_yellow)
         proto_ver = self._decode_byte(ansi_br_yellow)
@@ -536,59 +543,59 @@ class mqttdecode():
 
 
     def _decode_connack_v4(self):
-        self._output_text += f"Command:           {COMMAND_colour}CONNACK v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}CONNACK v3.1.1{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
 
-        resv = self._decode_byte(cleansession_colour)
+        resv = self._decode_byte(self.cols['cleansession'])
         if isinstance(resv, int):
             self._output_text += f"Session present:   {(resv & 0x01) == 0x01}\n"
             if resv & 0xFE:
-                self._output_text += f"Malformed connect acknowledge: {ansi_error}{resv}{ansi_reset}\n"
+                self._output_text += f"Malformed connect acknowledge: {self.cols['error']}{resv}{self.cols['reset']}\n"
         else:
             self._output_text += f"Connect acknowledge: {resv}\n"
 
-        rc = self._decode_byte(rc_colour)
+        rc = self._decode_byte(self.cols['rc'])
         try:
             rc_str = connack_strings[rc]
         except KeyError:
-            rc_str = f"{ansi_error}Invalid return code{ansi_reset}"
-        self._output_text += f"Return code:       {rc_colour}{rc} ({rc_str}){ansi_reset}\n"
+            rc_str = f"{self.cols['error']}Invalid return code{self.cols['reset']}"
+        self._output_text += f"Return code:       {self.cols['rc']}{rc} ({rc_str}){self.cols['reset']}\n"
         self._decode_excess_bytes()
         self._get_output_v4()
 
 
     def _decode_connack_v5(self):
-        self._output_text += f"Command:           {COMMAND_colour}CONNACK v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}CONNACK v5.0{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
 
-        resv = self._decode_byte(cleansession_colour)
+        resv = self._decode_byte(self.cols['cleansession'])
         if isinstance(resv, int):
             self._output_text += f"Session present:   {(resv & 0x01) == 0x01}\n"
             if resv & 0xFE:
-                self._output_text += f"Malformed connect acknowledge: {ansi_error}{resv}{ansi_reset}\n"
+                self._output_text += f"Malformed connect acknowledge: {self.cols['error']}{resv}{self.cols['reset']}\n"
         else:
             self._output_text += f"Connect acknowledge: {resv}\n"
 
-        rc = self._decode_byte(rc_colour)
+        rc = self._decode_byte(self.cols['rc'])
         try:
             rc_str = reason_code_strings[rc]
         except KeyError:
-            rc_str = f"{ansi_error}Invalid reason code{ansi_reset}"
-        self._output_text += f"Reason code:       {rc_colour}{rc} ({rc_str}){ansi_reset}\n"
+            rc_str = f"{self.cols['error']}Invalid reason code{self.cols['reset']}"
+        self._output_text += f"Reason code:       {self.cols['rc']}{rc} ({rc_str}){self.cols['reset']}\n"
         self._decode_properties()
         self._decode_excess_bytes()
         self._get_output_v5()
 
 
     def _decode_connack(self):
-        if self.args.force_version is None or self.args.force_version == 4:
+        if self.args.force_spec is None or self.args.force_spec == 4:
             self._decode_connack_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
             self._decode_connack_v5()
 
@@ -597,16 +604,19 @@ class mqttdecode():
         if self._rl <= 0 or self._packet is None:
             self._output_text += "Payload:\n"
 
-        payload = struct.unpack(f"{self._rl}s", self._packet[0:self._rl])[0]
-        self._packet = self._packet[self._rl:]
+        decodelen = min(len(self._packet), self._rl)
+        payload = struct.unpack(f"{decodelen}s", self._packet[0:decodelen])[0]
+        self._packet = self._packet[decodelen:]
         plen = self._rl
         self._rl = 0
         try:
             p = payload.decode('utf-8')
         except UnicodeDecodeError:
             p = payload.hex()
-        self._output_text += f"Payload:           ({string_length_colour}length: {plen}{ansi_reset}) {payload_colour}{p}{ansi_reset}\n"
-        self._output_hex += f"{payload_colour}{payload.hex()}{ansi_reset}"
+        if decodelen < plen:
+            p += self.errstr
+        self._output_text += f"Payload:           (length: {plen}) {self.cols['payload']}{p}{self.cols['reset']}\n"
+        self._output_hex += f"{self.cols['payload']}{payload.hex()}{self.cols['reset']}"
 
 
     def _decode_publish_v4(self):
@@ -621,17 +631,19 @@ class mqttdecode():
             dup = ""
 
         if qos == 3:
-            qos = f"{ansi_error}3{ansi_reset}"
+            qos = f"{self.cols['error']}3{self.cols['reset']}"
 
-        self._output_text += f"Command:           {COMMAND_colour}PUBLISH v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}PUBLISH v3.1.1{self.cols['reset']}\n"
+        cmd = (self._hdr & 0xF0) >> 4
+        flags = (self._hdr & 0x0F)
+        self._output_hex = f"{self.cols['command']}{cmd:x}{self.cols['qos']}{flags:x}{self.cols['reset']} " + self._output_hex
+        self._output_text += f"QoS:               {self.cols['qos']}{qos}{self.cols['reset']}\n"
+        self._output_text += f"Flags:             {self.cols['retain']}{retain}{self.cols['reset']} {self.cols['dup']}{dup}{self.cols['reset']}\n"
         self._print_length(self._rl)
 
-        topic, topic_len = self._decode_string(topic_colour)
+        topic, topic_len = self._decode_string(self.cols['topic'])
 
-        self._output_text += f"Topic:             ({string_length_colour}length: {topic_len}{ansi_reset}) {topic_colour}{topic}{ansi_reset}\n"
-        self._output_text += f"QoS:               {qos_colour}{qos}{ansi_reset}\n"
-        self._output_text += f"Flags:             {retain_colour}{retain}{ansi_reset} {dup_colour}{dup}{ansi_reset}\n"
+        self._output_text += f"Topic:             ({self.cols['strlen']}length: {topic_len}{self.cols['reset']}) {self.cols['topic']}{topic}{self.cols['reset']}\n"
         if qos == 1 or qos == 2:
             self._decode_mid()
 
@@ -651,17 +663,19 @@ class mqttdecode():
             dup = ""
 
         if qos == 3:
-            qos = f"{ansi_error}3{ansi_reset}"
+            qos = f"{self.cols['error']}3{self.cols['reset']}"
 
-        self._output_text += f"Command:           {COMMAND_colour}PUBLISH v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}PUBLISH v5.0{self.cols['reset']}\n"
+        cmd = (self._hdr & 0xF0) >> 8
+        flags = (self._hdr & 0x0F)
+        self._output_hex = f"{self.cols['command']}{cmd:x}{self.cols['qos']}{flags:x}{self.cols['reset']} " + self._output_hex
+        self._output_text += f"QoS:               {self.cols['qos']}{qos}{self.cols['reset']}\n"
+        self._output_text += f"Flags:             {self.cols['retain']}{retain}{self.cols['reset']} {self.cols['dup']}{dup}{self.cols['reset']}\n"
         self._print_length(self._rl)
 
-        topic, topic_len = self._decode_string(topic_colour)
+        topic, topic_len = self._decode_string(self.cols['topic'])
 
-        self._output_text += f"Topic:             ({string_length_colour}length: {topic_len}{ansi_reset}) {topic_colour}{topic}{ansi_reset}\n"
-        self._output_text += f"QoS:               {qos_colour}{qos}{ansi_reset}\n"
-        self._output_text += f"Flags:             {retain_colour}{retain}{ansi_reset} {dup_colour}{dup}{ansi_reset}\n"
+        self._output_text += f"Topic:             ({self.cols['strlen']}length: {topic_len}{self.cols['reset']}) {self.cols['topic']}{topic}{self.cols['reset']}\n"
         if qos == 1 or qos == 2:
             self._decode_mid()
         self._decode_properties()
@@ -670,10 +684,10 @@ class mqttdecode():
 
 
     def _decode_publish(self):
-        if self.args.force_version is None or self.args.force_version == 4:
+        if self.args.force_spec is None or self.args.force_spec == 4:
             self._decode_publish_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
             self._decode_publish_v5()
 
@@ -698,159 +712,159 @@ class mqttdecode():
 
 
     def _decode_puback(self):
-        if self.args.force_version is None or self.args.force_version == 4:
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
-            self._output_text += f"Command:           {COMMAND_colour}PUBACK v3.1.1{ansi_reset}\n"
+        if self.args.force_spec is None or self.args.force_spec == 4:
+            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+            self._output_text += f"Command:           {self.cols['command']}PUBACK v3.1.1{self.cols['reset']}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
-            self._output_text += f"Command:           {COMMAND_colour}PUBACK v5.0{ansi_reset}\n"
+            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+            self._output_text += f"Command:           {self.cols['command']}PUBACK v5.0{self.cols['reset']}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v5()
 
 
     def _decode_pubrec(self):
-        if self.args.force_version is None or self.args.force_version == 4:
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
-            self._output_text += f"Command:           {COMMAND_colour}PUBREC v3.1.1{ansi_reset}\n"
+        if self.args.force_spec is None or self.args.force_spec == 4:
+            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+            self._output_text += f"Command:           {self.cols['command']}PUBREC v3.1.1{self.cols['reset']}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
-            self._output_text += f"Command:           {COMMAND_colour}PUBREC v5.0{ansi_reset}\n"
+            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+            self._output_text += f"Command:           {self.cols['command']}PUBREC v5.0{self.cols['reset']}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v5()
 
 
     def _decode_pubrel(self):
-        if self.args.force_version is None or self.args.force_version == 4:
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
-            self._output_text += f"Command:           {COMMAND_colour}PUBREL v3.1.1{ansi_reset}\n"
+        if self.args.force_spec is None or self.args.force_spec == 4:
+            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+            self._output_text += f"Command:           {self.cols['command']}PUBREL v3.1.1{self.cols['reset']}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
-            self._output_text += f"Command:           {COMMAND_colour}PUBREL v5.0{ansi_reset}\n"
+            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+            self._output_text += f"Command:           {self.cols['command']}PUBREL v5.0{self.cols['reset']}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v5()
 
 
     def _decode_pubcomp(self):
-        if self.args.force_version is None or self.args.force_version == 4:
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
-            self._output_text += f"Command:           {COMMAND_colour}PUBCOMP v3.1.1{ansi_reset}\n"
+        if self.args.force_spec is None or self.args.force_spec == 4:
+            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+            self._output_text += f"Command:           {self.cols['command']}PUBCOMP v3.1.1{self.cols['reset']}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
-            self._output_text += f"Command:           {COMMAND_colour}PUBCOMP v5.0{ansi_reset}\n"
+            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+            self._output_text += f"Command:           {self.cols['command']}PUBCOMP v5.0{self.cols['reset']}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v5()
 
 
     def _decode_subscribe_v4(self):
-        self._output_text += f"Command:           {COMMAND_colour}SUBSCRIBE v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}SUBSCRIBE v3.1.1{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x02)
         self._print_length(self._rl)
         self._decode_mid()
         while self._rl > 0:
-            topic, topic_len = self._decode_string(topic_colour)
-            qos = self._decode_byte(qos_colour)
+            topic, topic_len = self._decode_string(self.cols['topic'])
+            qos = self._decode_byte(self.cols['qos'])
             if isinstance(qos, int) and qos > 2:
-                qos = f"{ansi_error}3{ansi_reset}"
-            self._output_text += f"Topic:             ({string_length_colour}length: {topic_len}{ansi_reset}) {topic_colour}{topic}{ansi_reset}\n"
-            self._output_text += f"  QoS:             {qos_colour}{qos}{ansi_reset}\n"
+                qos = f"{self.cols['error']}3{self.cols['reset']}"
+            self._output_text += f"Topic:             ({self.cols['strlen']}length: {topic_len}{self.cols['reset']}) {self.cols['topic']}{topic}{self.cols['reset']}\n"
+            self._output_text += f"  QoS:             {self.cols['qos']}{qos}{self.cols['reset']}\n"
 
         self._decode_excess_bytes()
         self._get_output_v4()
 
 
     def _decode_subscribe_v5(self):
-        self._output_text += f"Command:           {COMMAND_colour}SUBSCRIBE v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}SUBSCRIBE v5.0{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x02)
         self._print_length(self._rl)
         self._decode_mid()
         self._decode_properties()
         while self._rl > 0:
-            topic, topic_len = self._decode_string(topic_colour)
-            options = self._decode_byte(sub_opt_colour)
+            topic, topic_len = self._decode_string(self.cols['topic'])
+            options = self._decode_byte(self.cols['subopt'])
             if isinstance(options, int):
                 qos = options & 0x03
                 if qos == 3:
-                    qos = f"{ansi_error}3{ansi_reset}"
-                self._output_text += f"Topic:             ({string_length_colour}length: {topic_len}{ansi_reset}) {topic_colour}{topic}{ansi_reset}\n"
-                self._output_text += f"  QoS:             {qos_colour}{qos}{ansi_reset}\n"
+                    qos = f"{self.cols['error']}3{self.cols['reset']}"
+                self._output_text += f"Topic:             ({self.cols['strlen']}length: {topic_len}{self.cols['reset']}) {self.cols['topic']}{topic}{self.cols['reset']}\n"
+                self._output_text += f"  QoS:             {self.cols['qos']}{qos}{self.cols['reset']}\n"
                 if options & 0x04:
-                    self._output_text += f"  Flags:           {sub_opt_colour}no-local{ansi_reset}\n"
+                    self._output_text += f"  Flags:           {self.cols['subopt']}no-local{self.cols['reset']}\n"
                 if options & 0x08:
-                    self._output_text += f"  Flags:           {sub_opt_colour}retain-as-published{ansi_reset}\n"
+                    self._output_text += f"  Flags:           {self.cols['subopt']}retain-as-published{self.cols['reset']}\n"
                 retain_handling = options & 0x30
                 if retain_handling == 0x00:
-                    self._output_text += f"  Flags:           {sub_opt_colour}send-retain-on-subscription{ansi_reset}\n"
+                    self._output_text += f"  Flags:           {self.cols['subopt']}send-retain-on-subscription{self.cols['reset']}\n"
                 elif retain_handling == 0x10:
-                    self._output_text += f"  Flags:           {sub_opt_colour}send-retain-on-new-subscription{ansi_reset}\n"
+                    self._output_text += f"  Flags:           {self.cols['subopt']}send-retain-on-new-subscription{self.cols['reset']}\n"
                 elif retain_handling == 0x20:
-                    self._output_text += f"  Flags:           {sub_opt_colour}send-retain-never{ansi_reset}\n"
+                    self._output_text += f"  Flags:           {self.cols['subopt']}send-retain-never{self.cols['reset']}\n"
                 else:
-                    self._output_text += f"  Flags:           {ansi_error}send-retain-malformed{ansi_reset}\n"
+                    self._output_text += f"  Flags:           {self.cols['error']}send-retain-malformed{self.cols['reset']}\n"
                 if options & 0xC0:
-                    self._output_text += f"  Flags:           {ansi_error}Subscription options malformed: {options:02x}{ansi_reset}\n"
+                    self._output_text += f"  Flags:           {self.cols['error']}Subscription options malformed: {options:02x}{self.cols['reset']}\n"
             else:
-                self._output_text += f"Topic:             ({string_length_colour}length: {topic_len}{ansi_reset}) {topic_colour}{topic}{ansi_reset}\n"
-                self._output_text += f"  Flags:           {ansi_error}Subscription options malformed: {options}{ansi_reset}\n"
+                self._output_text += f"Topic:             ({self.cols['strlen']}length: {topic_len}{self.cols['reset']}) {self.cols['topic']}{topic}{self.cols['reset']}\n"
+                self._output_text += f"  Flags:           {self.cols['error']}Subscription options malformed: {options}{self.cols['reset']}\n"
 
         self._decode_excess_bytes()
         self._get_output_v5()
 
 
     def _decode_subscribe(self):
-        if self.args.force_version is None or self.args.force_version == 4:
+        if self.args.force_spec is None or self.args.force_spec == 4:
             self._decode_subscribe_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
             self._decode_subscribe_v5()
 
 
     def _decode_suback_v4(self):
-        self._output_text += f"Command:           {COMMAND_colour}SUBACK v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}SUBACK v3.1.1{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
         if self._packet is None or len(self._packet) == 0:
-            self._output_text += f"Granted Qos:       {errstr}\n"
+            self._output_text += f"Granted Qos:       {self.errstr}\n"
         while self._rl > 0:
-            qos = self._decode_byte(qos_colour)
+            qos = self._decode_byte(self.cols['qos'])
             if isinstance(qos, int) and qos <= 2:
-                self._output_text += f"Granted QoS:       {qos_colour}{qos}{ansi_reset}\n"
+                self._output_text += f"Granted QoS:       {self.cols['qos']}{qos}{self.cols['reset']}\n"
             else:
-                self._output_text += f"Granted QoS:       {ansi_error}{qos}{ansi_reset}\n"
+                self._output_text += f"Granted QoS:       {self.cols['error']}{qos}{self.cols['reset']}\n"
         self._get_output_v4()
 
 
     def _decode_suback_v5(self):
-        self._output_text += f"Command:           {COMMAND_colour}SUBACK v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}SUBACK v5.0{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
         self._decode_properties()
         if self._packet is None or len(self._packet) == 0:
-            self._output_text += f"Reason code:       {errstr}\n"
+            self._output_text += f"Reason code:       {self.errstr}\n"
         while self._rl > 0:
-            byte = self._decode_byte(rc_colour)
+            byte = self._decode_byte(self.cols['rc'])
             if isinstance(byte, int) and byte <= 2:
                 self._output_text += f"Reason code:       {byte}\n"
             else:
@@ -859,55 +873,55 @@ class mqttdecode():
 
 
     def _decode_suback(self):
-        if self.args.force_version is None or self.args.force_version == 4:
+        if self.args.force_spec is None or self.args.force_spec == 4:
             self._decode_suback_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
             self._decode_suback_v5()
 
 
     def _decode_unsubscribe_v4(self):
-        self._output_text += f"Command:           {COMMAND_colour}UNSUBSCRIBE v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}UNSUBSCRIBE v3.1.1{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x02)
         self._print_length(self._rl)
         self._decode_mid()
         while self._rl > 0:
-            topic, topic_len = self._decode_string(topic_colour)
-            self._output_text += f"Topic:             ({string_length_colour}length: {topic_len}{ansi_reset}) {topic_colour}{topic}{ansi_reset}\n"
+            topic, topic_len = self._decode_string(self.cols['topic'])
+            self._output_text += f"Topic:             ({self.cols['strlen']}length: {topic_len}{self.cols['reset']}) {self.cols['topic']}{topic}{self.cols['reset']}\n"
 
         self._decode_excess_bytes()
         self._get_output_v4()
 
 
     def _decode_unsubscribe_v5(self):
-        self._output_text += f"Command:           {COMMAND_colour}UNSUBSCRIBE v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}UNSUBSCRIBE v5.0{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x02)
         self._print_length(self._rl)
         self._decode_mid()
         self._decode_properties()
         while self._rl > 0:
-            topic, topic_len = self._decode_string(topic_colour)
-            self._output_text += f"Topic:             ({string_length_colour}length: {topic_len}{ansi_reset}) {topic_colour}{topic}{ansi_reset}\n"
+            topic, topic_len = self._decode_string(self.cols['topic'])
+            self._output_text += f"Topic:             ({self.cols['strlen']}length: {topic_len}{self.cols['reset']}) {self.cols['topic']}{topic}{self.cols['reset']}\n"
 
         self._decode_excess_bytes()
         self._get_output_v5()
 
 
     def _decode_unsubscribe(self):
-        if self.args.force_version is None or self.args.force_version == 4:
+        if self.args.force_spec is None or self.args.force_spec == 4:
             self._decode_unsubscribe_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
             self._decode_unsubscribe_v5()
 
 
     def _decode_unsuback_v4(self):
-        self._output_text += f"Command:           {COMMAND_colour}UNSUBACK v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}UNSUBACK v3.1.1{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
@@ -916,8 +930,8 @@ class mqttdecode():
 
 
     def _decode_unsuback_v5(self):
-        self._output_text += f"Command:           {COMMAND_colour}UNSUBACK v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}UNSUBACK v5.0{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
@@ -928,17 +942,17 @@ class mqttdecode():
 
 
     def _decode_unsuback(self):
-        if self.args.force_version is None or self.args.force_version == 4:
+        if self.args.force_spec is None or self.args.force_spec == 4:
             self._decode_unsuback_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
             self._decode_unsuback_v5()
 
 
     def _decode_ping(self, label):
-        self._output_text += f"Command:           {COMMAND_colour}{label} v3.1.1/v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}{label} v3.1.1/v5.0{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl, 0)
         self._decode_excess_bytes()
@@ -954,8 +968,8 @@ class mqttdecode():
 
 
     def _decode_disconnect_v4(self):
-        self._output_text += f"Command:           {COMMAND_colour}DISCONNECT v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}DISCONNECT v3.1.1{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl, 0)
         self._decode_excess_bytes()
@@ -963,8 +977,8 @@ class mqttdecode():
 
 
     def _decode_disconnect_v5(self):
-        self._output_text += f"Command:           {COMMAND_colour}DISCONNECT v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}DISCONNECT v5.0{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_reason_code()
@@ -974,24 +988,24 @@ class mqttdecode():
 
 
     def _decode_disconnect(self):
-        if self.args.force_version is None or self.args.force_version == 4:
+        if self.args.force_spec is None or self.args.force_spec == 4:
             self._decode_disconnect_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
             self._decode_disconnect_v5()
 
 
     def _decode_auth_v4(self):
-        self._output_text += f"Command:           {ansi_error}AUTH{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['error']}AUTH{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_length(self._rl)
         self._decode_excess_bytes()
         self._get_output_v4()
 
     def _decode_auth_v5(self):
-        self._output_text += f"Command:           {COMMAND_colour}AUTH v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}AUTH v5.0{self.cols['reset']}\n"
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_reason_code()
@@ -1000,10 +1014,10 @@ class mqttdecode():
         self._get_output_v5()
 
     def _decode_auth(self):
-        if self.args.force_version is None or self.args.force_version == 4:
+        if self.args.force_spec is None or self.args.force_spec == 4:
             self._decode_auth_v4()
 
-        if self.args.force_version is None or self.args.force_version == 5:
+        if self.args.force_spec is None or self.args.force_spec == 5:
             self._restore_state()
             self._decode_auth_v5()
 
@@ -1017,7 +1031,7 @@ class mqttdecode():
         self._output_hex_v5 = ""
         self._hdr, self._packet = struct.unpack("!B%ds" % (len(self._packet)-1), bytes(self._packet))
         self._rl = 100 # to keep decode_varint happy
-        self._rl, _ = self._decode_varint(length_colour)
+        self._rl, _ = self._decode_varint(self.cols['length'])
         self._save_state()
 
         cmd = self._hdr & 0xF0
@@ -1064,12 +1078,16 @@ def get_args():
     )
 
     parser.add_argument(
-        "--force-version", action="store", type=int, default=None,
+        '-s', "--force-spec", action="store", type=int, default=None,
         choices=[4, 5],
         help="force MQTT protocol version to use: 4 (for v3.1.1), or 5 (for v5.0). Does not apply to CONNECT packets"
     )
+    parser.add_argument(
+        "--no-colour", action="store_true", default=False,
+        help="don't colourise the output"
+    )
 
-    parser.add_argument('--file', type=str, help='file to read strings from')
+    parser.add_argument('-f', '--file', type=str, help='file to read strings from')
     parser.add_argument('hex', metavar='hex', type=str, nargs='*', help='a hex string to parse')
 
     return parser.parse_args()
