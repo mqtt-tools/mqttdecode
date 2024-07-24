@@ -215,6 +215,8 @@ class mqttdecode():
             self._packet = self._packet[1:]
         except (IndexError, TypeError):
             byte = f"{ansi_error}?{ansi_reset}"
+            if len(self._packet) < 1:
+                self._packet = None
         self._rl -= 1
         return byte
 
@@ -228,6 +230,8 @@ class mqttdecode():
             self._packet = self._packet[2:]
         except (IndexError, struct.error, TypeError):
             i16 = f"{ansi_error}?{ansi_reset}"
+            if len(self._packet) < 2:
+                self._packet = None
         self._rl -= 2
         return i16
 
@@ -241,6 +245,8 @@ class mqttdecode():
             self._packet = self._packet[4:]
         except (IndexError, struct.error):
             i32 = f"{ansi_error}?{ansi_reset}"
+            if len(self._packet) < 4:
+                self._packet = None
         self._rl -= 4
         return i32
 
@@ -286,6 +292,8 @@ class mqttdecode():
                 self._rl -= slen
                 self._packet = self._packet[slen:]
                 s = s.decode('utf-8')
+                if slen < slen_full:
+                    s += errstr
                 return s, slen_full
             except (IndexError, struct.error, UnicodeDecodeError):
                 s = f"{ansi_error}?{ansi_reset}"
@@ -389,6 +397,8 @@ class mqttdecode():
 
     def _decode_connect_v34(self, cs_label):
         flags = self._decode_byte(cleansession_colour)
+        if isinstance(flags, str):
+            return
         username_flag = (flags & 0x80) == 0x80
         password_flag = (flags & 0x40) == 0x40
         will_retain = (flags & 0x20) == 0x20
@@ -400,8 +410,8 @@ class mqttdecode():
         keepalive = self._decode_uint16(keepalive_colour)
         clientid, clientid_len = self._decode_string(clientid_colour)
         if will_flag:
-            will_topic, will_topic_len = self._decode_string(will_colour)
-            will_message, will_message_len = self._decode_string(will_colour)
+            will_topic, will_topic_len = self._decode_string(WILL_colour)
+            will_message, will_message_len = self._decode_string(WILL_colour)
         if username_flag:
             username, username_len = self._decode_string(username_colour)
         else:
@@ -467,8 +477,8 @@ class mqttdecode():
         keepalive = self._decode_uint16(keepalive_colour)
         clientid, clientid_len = self._decode_string(clientid_colour)
         if will_flag:
-            will_topic, will_topic_len = self._decode_string(will_colour)
-            will_message, will_message_len = self._decode_string(will_colour)
+            will_topic, will_topic_len = self._decode_string(WILL_colour)
+            will_message, will_message_len = self._decode_string(WILL_colour)
         if username_flag:
             username, username_len = self._decode_string(username_colour)
         else:
@@ -670,7 +680,7 @@ class mqttdecode():
     def _decode_pubflow_v5(self):
         self._print_length(self._rl)
         self._decode_mid()
-        if len(self._packet) > 0:
+        if self._packet is not None and len(self._packet) > 0:
             self._decode_reason_code()
         else:
             self._print_reason_code(0) # implied success by omission
