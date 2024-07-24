@@ -375,7 +375,7 @@ class mqttdecode():
     def _print_length(self, rl, expected=-1):
         if isinstance(rl, str):
             self._output_text += f"Length:            {self.cols['length']}{rl}{self.cols['reset']}\n"
-            exit(1)
+            return
 
         if expected == -1 or rl == expected:
             self._output_text += f"Length:            {self.cols['length']}{rl}{self.cols['reset']}\n"
@@ -1037,6 +1037,10 @@ class mqttdecode():
         self._rl, _ = self._decode_varint(self.cols['length'])
         self._save_state()
 
+        if isinstance(self._rl, str):
+            self._output_hex_v4 = f"{self.cols['error']}{self._hdr:02x}{self.cols['reset']}"
+            return
+
         cmd = self._hdr & 0xF0
         if cmd == 0x00:
             self._decode_reserved()
@@ -1070,7 +1074,6 @@ class mqttdecode():
             self._decode_disconnect()
         elif cmd == 0xF0:
             self._decode_auth()
-        return ""
 
 def get_args():
     parser = argparse.ArgumentParser(
