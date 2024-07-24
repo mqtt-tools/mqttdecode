@@ -213,7 +213,7 @@ class mqttdecode():
             return errstr
         try:
             byte = self._packet[0]
-            self._output_hex += f"{col}{byte:02x}{ansi_reset}"
+            self._output_hex += f"{col}{byte:02x}{ansi_reset} "
             self._packet = self._packet[1:]
         except (IndexError, TypeError):
             byte = errstr
@@ -228,7 +228,7 @@ class mqttdecode():
             return errstr
         try:
             i16 = struct.unpack('!H', self._packet[0:2])[0]
-            self._output_hex += f"{col}{self._packet[0:2].hex()}{ansi_reset}"
+            self._output_hex += f"{col}{self._packet[0:2].hex()}{ansi_reset} "
             self._packet = self._packet[2:]
         except (IndexError, struct.error, TypeError):
             i16 = errstr
@@ -243,7 +243,7 @@ class mqttdecode():
             return errstr
         try:
             i32 = struct.unpack('!I', self._packet[0:4])[0]
-            self._output_hex += f"{col}{self._packet[0:4].hex()}{ansi_reset}"
+            self._output_hex += f"{col}{self._packet[0:4].hex()}{ansi_reset} "
             self._packet = self._packet[4:]
         except (IndexError, struct.error):
             i32 = errstr
@@ -265,7 +265,7 @@ class mqttdecode():
             try:
                 byte = self._packet[0]
                 self._packet = self._packet[1:]
-                self._output_hex += f"{col}{byte:02x}{ansi_reset}"
+                self._output_hex += f"{col}{byte:02x}{ansi_reset} "
             except IndexError:
                 varint = errstr
                 return (varint, vl)
@@ -290,7 +290,7 @@ class mqttdecode():
             try:
                 slen = min(slen_full, self._rl)
                 s = struct.unpack(f'!{slen}s', self._packet[0:slen])[0]
-                self._output_hex += f"{col}{self._packet[0:slen].hex()}{ansi_reset}"
+                self._output_hex += f"{col}{self._packet[0:slen].hex()}{ansi_reset} "
                 self._rl -= slen
                 self._packet = self._packet[slen:]
                 s = s.decode('utf-8')
@@ -389,7 +389,7 @@ class mqttdecode():
 
     def _decode_reserved(self):
         self._output_text += f"Command:           {ansi_error}RESERVED{ansi_reset}\n"
-        self._output_hex = f"{ansi_error}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{ansi_error}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_length(self._rl)
         self._decode_excess_bytes()
         self._get_output_v4()
@@ -519,7 +519,7 @@ class mqttdecode():
 
 
     def _decode_connect(self):
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         rl_start = self._rl
         proto_name, _ = self._decode_string(ansi_br_yellow)
         proto_ver = self._decode_byte(ansi_br_yellow)
@@ -537,7 +537,7 @@ class mqttdecode():
 
     def _decode_connack_v4(self):
         self._output_text += f"Command:           {COMMAND_colour}CONNACK v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
 
@@ -561,7 +561,7 @@ class mqttdecode():
 
     def _decode_connack_v5(self):
         self._output_text += f"Command:           {COMMAND_colour}CONNACK v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
 
@@ -623,7 +623,7 @@ class mqttdecode():
             qos = f"{ansi_error}3{ansi_reset}"
 
         self._output_text += f"Command:           {COMMAND_colour}PUBLISH v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_length(self._rl)
 
         topic, topic_len = self._decode_string(topic_colour)
@@ -653,7 +653,7 @@ class mqttdecode():
             qos = f"{ansi_error}3{ansi_reset}"
 
         self._output_text += f"Command:           {COMMAND_colour}PUBLISH v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_length(self._rl)
 
         topic, topic_len = self._decode_string(topic_colour)
@@ -698,14 +698,14 @@ class mqttdecode():
 
     def _decode_puback(self):
         if self.args.force_version is None or self.args.force_version == 4:
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
             self._output_text += f"Command:           {COMMAND_colour}PUBACK v3.1.1{ansi_reset}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v4()
 
         if self.args.force_version is None or self.args.force_version == 5:
             self._restore_state()
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
             self._output_text += f"Command:           {COMMAND_colour}PUBACK v5.0{ansi_reset}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v5()
@@ -713,14 +713,14 @@ class mqttdecode():
 
     def _decode_pubrec(self):
         if self.args.force_version is None or self.args.force_version == 4:
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
             self._output_text += f"Command:           {COMMAND_colour}PUBREC v3.1.1{ansi_reset}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v4()
 
         if self.args.force_version is None or self.args.force_version == 5:
             self._restore_state()
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
             self._output_text += f"Command:           {COMMAND_colour}PUBREC v5.0{ansi_reset}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v5()
@@ -728,14 +728,14 @@ class mqttdecode():
 
     def _decode_pubrel(self):
         if self.args.force_version is None or self.args.force_version == 4:
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
             self._output_text += f"Command:           {COMMAND_colour}PUBREL v3.1.1{ansi_reset}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v4()
 
         if self.args.force_version is None or self.args.force_version == 5:
             self._restore_state()
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
             self._output_text += f"Command:           {COMMAND_colour}PUBREL v5.0{ansi_reset}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v5()
@@ -743,14 +743,14 @@ class mqttdecode():
 
     def _decode_pubcomp(self):
         if self.args.force_version is None or self.args.force_version == 4:
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
             self._output_text += f"Command:           {COMMAND_colour}PUBCOMP v3.1.1{ansi_reset}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v4()
 
         if self.args.force_version is None or self.args.force_version == 5:
             self._restore_state()
-            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+            self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
             self._output_text += f"Command:           {COMMAND_colour}PUBCOMP v5.0{ansi_reset}\n"
             self._print_fixed_header(0x00)
             self._decode_pubflow_v5()
@@ -758,7 +758,7 @@ class mqttdecode():
 
     def _decode_subscribe_v4(self):
         self._output_text += f"Command:           {COMMAND_colour}SUBSCRIBE v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x02)
         self._print_length(self._rl)
         self._decode_mid()
@@ -776,7 +776,7 @@ class mqttdecode():
 
     def _decode_subscribe_v5(self):
         self._output_text += f"Command:           {COMMAND_colour}SUBSCRIBE v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x02)
         self._print_length(self._rl)
         self._decode_mid()
@@ -824,7 +824,7 @@ class mqttdecode():
 
     def _decode_suback_v4(self):
         self._output_text += f"Command:           {COMMAND_colour}SUBACK v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
@@ -841,7 +841,7 @@ class mqttdecode():
 
     def _decode_suback_v5(self):
         self._output_text += f"Command:           {COMMAND_colour}SUBACK v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
@@ -868,7 +868,7 @@ class mqttdecode():
 
     def _decode_unsubscribe_v4(self):
         self._output_text += f"Command:           {COMMAND_colour}UNSUBSCRIBE v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x02)
         self._print_length(self._rl)
         self._decode_mid()
@@ -882,7 +882,7 @@ class mqttdecode():
 
     def _decode_unsubscribe_v5(self):
         self._output_text += f"Command:           {COMMAND_colour}UNSUBSCRIBE v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x02)
         self._print_length(self._rl)
         self._decode_mid()
@@ -906,7 +906,7 @@ class mqttdecode():
 
     def _decode_unsuback_v4(self):
         self._output_text += f"Command:           {COMMAND_colour}UNSUBACK v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
@@ -916,7 +916,7 @@ class mqttdecode():
 
     def _decode_unsuback_v5(self):
         self._output_text += f"Command:           {COMMAND_colour}UNSUBACK v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
@@ -937,7 +937,7 @@ class mqttdecode():
 
     def _decode_ping(self, label):
         self._output_text += f"Command:           {COMMAND_colour}{label} v3.1.1/v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl, 0)
         self._decode_excess_bytes()
@@ -954,7 +954,7 @@ class mqttdecode():
 
     def _decode_disconnect_v4(self):
         self._output_text += f"Command:           {COMMAND_colour}DISCONNECT v3.1.1{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl, 0)
         self._decode_excess_bytes()
@@ -963,7 +963,7 @@ class mqttdecode():
 
     def _decode_disconnect_v5(self):
         self._output_text += f"Command:           {COMMAND_colour}DISCONNECT v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_reason_code()
@@ -983,14 +983,14 @@ class mqttdecode():
 
     def _decode_auth_v4(self):
         self._output_text += f"Command:           {ansi_error}AUTH{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_length(self._rl)
         self._decode_excess_bytes()
         self._get_output_v4()
 
     def _decode_auth_v5(self):
         self._output_text += f"Command:           {COMMAND_colour}AUTH v5.0{ansi_reset}\n"
-        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset}" + self._output_hex
+        self._output_hex = f"{COMMAND_colour}{self._hdr:02x}{ansi_reset} " + self._output_hex
         self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_reason_code()
