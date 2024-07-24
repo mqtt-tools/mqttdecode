@@ -1101,6 +1101,12 @@ def main():
 
     decoder = mqttdecode(args)
 
+    if args.file is not None:
+        with open(args.file, "rt") as f:
+            for line in f:
+                decoder.decode("".join(line))
+                print("------------------------------\n")
+
     if len(args.hex) > 0:
         decoder.decode("".join(args.hex))
 
