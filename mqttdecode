@@ -603,6 +603,7 @@ class mqttdecode():
     def _decode_payload(self):
         if self._rl <= 0 or self._packet is None:
             self._output_text += "Payload:\n"
+            return
 
         decodelen = min(len(self._packet), self._rl)
         payload = struct.unpack(f"{decodelen}s", self._packet[0:decodelen])[0]
