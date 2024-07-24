@@ -37,6 +37,7 @@ ansi_br_magenta = "\u001b[95m"
 ansi_br_cyan = "\u001b[96m"
 ansi_br_white = "\u001b[97m"
 ansi_br_yellow2 = "\u001b[38;5;228m"
+ansi_br_br_cyan = "\u001b[38;5;87m"
 
 connack_strings = {
     0: "accepted",
@@ -136,6 +137,7 @@ class COLOURS():
             'password': ansi_br_cyan,
             'payload': ansi_br_blue,
             'property': ansi_br_blue,
+            'proptype': ansi_br_br_cyan,
             'protover': ansi_br_cyan,
             'qos': ansi_br_cyan,
             'rc': ansi_br_cyan,
@@ -315,17 +317,17 @@ class mqttdecode():
             return
         if self._packet is None or len(self._packet) == 0:
             return
-        pl, _ = self._decode_varint(self.cols['property'])
+        pl, _ = self._decode_varint(self.cols['length'])
         if pl > self._rl:
             self._output_text += f"Properties Length: {self.cols['error']}{pl} > remaining length{self.cols['reset']}\n"
             return
         else:
-            self._output_text += f"Properties Length: {pl}\n"
+            self._output_text += f"Properties Length: {self.cols['length']}{pl}{self.cols['reset']}\n"
         if not isinstance(pl, int):
             return
 
         while self._rl > 0 and pl > 0:
-            prop, vl = self._decode_varint(self.cols['property'])
+            prop, vl = self._decode_varint(self.cols['proptype'])
             pl -= vl
 
             try:
@@ -333,7 +335,7 @@ class mqttdecode():
             except KeyError:
                 self._output_text += f"Property:          Unknown type: {self.cols['error']}{prop}{self.cols['reset']}\n"
                 return 0, None
-            self._output_text += f"Property:          {self.cols['property']}{prop},{propdef[0]} = "
+            self._output_text += f"Property:          {self.cols['proptype']}{prop},{propdef[0]}{self.cols['reset']} = "
             if propdef[1] == "byte":
                 v = self._decode_byte(self.cols['property'])
                 pl -= 1
@@ -354,7 +356,7 @@ class mqttdecode():
                 v, _ = self._decode_string(self.cols['property'])
                 pl -= (len(k) + 2 + len(v) + 2)
                 self._output_text += f"{k}:"
-            self._output_text += f"{v}{self.cols['reset']}\n"
+            self._output_text += f"{self.cols['property']}{v}{self.cols['reset']}\n"
 
 
     def _decode_mid(self):
