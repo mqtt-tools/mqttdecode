@@ -1101,6 +1101,11 @@ def main():
 
     decoder = mqttdecode(args)
 
+    if sys.stdin.isatty() == False:
+        for line in sys.stdin:
+            decoder.decode("".join(line))
+            print("------------------------------\n")
+
     if args.file is not None:
         with open(args.file, "rt") as f:
             for line in f:
