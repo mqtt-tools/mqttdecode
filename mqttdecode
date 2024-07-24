@@ -146,6 +146,8 @@ string_length_colour = ansi_br_yellow2
 COMMAND_colour = ansi_yellow
 WILL_colour = ansi_br_blue
 
+errstr = f"{ansi_error}?{ansi_reset}"
+
 class mqttdecode():
     def __init__(self, args):
         self.args = args
@@ -208,13 +210,13 @@ class mqttdecode():
 
     def _decode_byte(self, col):
         if self._rl <= 0:
-            return f"{ansi_error}?{ansi_reset}"
+            return errstr
         try:
             byte = self._packet[0]
             self._output_hex += f"{col}{byte:02x}{ansi_reset}"
             self._packet = self._packet[1:]
         except (IndexError, TypeError):
-            byte = f"{ansi_error}?{ansi_reset}"
+            byte = errstr
             if len(self._packet) < 1:
                 self._packet = None
         self._rl -= 1
@@ -223,13 +225,13 @@ class mqttdecode():
 
     def _decode_uint16(self, col):
         if self._rl <= 0:
-            return f"{ansi_error}?{ansi_reset}"
+            return errstr
         try:
             i16 = struct.unpack('!H', self._packet[0:2])[0]
             self._output_hex += f"{col}{self._packet[0:2].hex()}{ansi_reset}"
             self._packet = self._packet[2:]
         except (IndexError, struct.error, TypeError):
-            i16 = f"{ansi_error}?{ansi_reset}"
+            i16 = errstr
             if len(self._packet) < 2:
                 self._packet = None
         self._rl -= 2
@@ -238,13 +240,13 @@ class mqttdecode():
 
     def _decode_uint32(self, col):
         if self._rl <= 0:
-            return f"{ansi_error}?{ansi_reset}"
+            return errstr
         try:
             i32 = struct.unpack('!I', self._packet[0:4])[0]
             self._output_hex += f"{col}{self._packet[0:4].hex()}{ansi_reset}"
             self._packet = self._packet[4:]
         except (IndexError, struct.error):
-            i32 = f"{ansi_error}?{ansi_reset}"
+            i32 = errstr
             if len(self._packet) < 4:
                 self._packet = None
         self._rl -= 4
@@ -253,19 +255,19 @@ class mqttdecode():
 
     def _decode_varint(self, col):
         if self._rl <= 0:
-            return f"{ansi_error}?{ansi_reset}", 0
+            return errstr, 0
         mult = 1
         varint = 0
         vl = 0
         for i in range(0,4):
             if self._rl <= 0:
-                return f"{ansi_error}?{ansi_reset}", vl
+                return errstr, vl
             try:
                 byte = self._packet[0]
                 self._packet = self._packet[1:]
                 self._output_hex += f"{col}{byte:02x}{ansi_reset}"
             except IndexError:
-                varint = f"{ansi_error}?{ansi_reset}"
+                varint = errstr
                 return (varint, vl)
             self._rl -= 1
 
@@ -280,7 +282,7 @@ class mqttdecode():
 
     def _decode_string(self, col):
         if isinstance(self._rl, str) or self._rl <= 0:
-            return f"{ansi_error}?{ansi_reset}", "{ansi_error}?{ansi_reset}"
+            return errstr, errstr
         slen_full = self._decode_uint16(string_length_colour)
         if isinstance(slen_full, int):
             if slen_full == 0:
@@ -296,11 +298,9 @@ class mqttdecode():
                     s += errstr
                 return s, slen_full
             except (IndexError, struct.error, UnicodeDecodeError):
-                s = f"{ansi_error}?{ansi_reset}"
-                return s, s
+                return errstr, errstr
         else:
-            s = f"{ansi_error}?{ansi_reset}"
-            return s, s
+            return errstr, errstr
 
 
     def _decode_properties(self):
@@ -829,7 +829,7 @@ class mqttdecode():
         self._print_length(self._rl)
         self._decode_mid()
         if self._packet is None or len(self._packet) == 0:
-            self._output_text += f"Granted Qos:       {ansi_error}?{ansi_reset}\n"
+            self._output_text += f"Granted Qos:       {errstr}\n"
         while self._rl > 0:
             qos = self._decode_byte(qos_colour)
             if isinstance(qos, int) and qos <= 2:
@@ -847,7 +847,7 @@ class mqttdecode():
         self._decode_mid()
         self._decode_properties()
         if self._packet is None or len(self._packet) == 0:
-            self._output_text += f"Reason code:       {ansi_error}?{ansi_reset}\n"
+            self._output_text += f"Reason code:       {errstr}\n"
         while self._rl > 0:
             byte = self._decode_byte(rc_colour)
             if isinstance(byte, int) and byte <= 2:
