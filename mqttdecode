@@ -606,6 +606,7 @@ class mqttdecode():
         except UnicodeDecodeError:
             p = payload.hex()
         self._output_text += f"Payload:           ({string_length_colour}length: {plen}{ansi_reset}) {payload_colour}{p}{ansi_reset}\n"
+        self._output_hex += f"{payload_colour}{payload.hex()}{ansi_reset}"
 
 
     def _decode_publish_v4(self):
