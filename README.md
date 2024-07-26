@@ -34,7 +34,7 @@ file, arguments.
 ## Options
 
 ```
-usage: mqttdecoder [-h] [-s {4,5}] [--colour | --no-colour] [-f FILE] [hex ...]
+usage: mqttdecoder [-h] [-s {4,5}] [--colour | --no-colour] [--no-separator] [-f FILE] [hex ...]
 ```
 
 ### Specification version
@@ -66,6 +66,13 @@ Colour output is not available on Windows.
 ```
 mqttdecode --no-colour f00100
 ```
+
+### Packet separator
+
+By default, mqttdecode will print a separator line (------------) between
+multiple packets decoded in the same run. This is helpful if both v3.1.1 and
+v5.0 decoded versions of each packet are being printed. If you are using `-s 4`
+or `-s 5`, you may wish to suppress the separator using `--no-separator`.
 
 
 ## Example Output

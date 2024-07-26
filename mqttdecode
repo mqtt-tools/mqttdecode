@@ -205,7 +205,8 @@ class mqttdecode():
                 print(self._output_text_v5)
 
             if self._packet is not None and len(self._packet) > 0:
-                print("------------------------------\n")
+                if self.args.no_separator == False:
+                    print("------------------------------\n")
 
     def _save_state(self):
         self._packet_save = self._packet
@@ -1106,6 +1107,11 @@ def get_args():
         help="do not colourise the output"
     )
 
+    parser.add_argument(
+        '--no-separator', action="store_true", default=False,
+        help="don't print the ------- separator between different packets"
+    )
+
     parser.add_argument('-f', '--file', type=str, help='file to read strings from')
     parser.add_argument('hex', metavar='hex', type=str, nargs='*', help='a hex string to parse')
 
@@ -1133,13 +1139,15 @@ def main():
     if sys.stdin.isatty() == False:
         for line in sys.stdin:
             decoder.decode("".join(line))
-            print("------------------------------\n")
+            if args.no_separator == False:
+                print("------------------------------\n")
 
     if args.file is not None:
         with open(args.file, "rt") as f:
             for line in f:
                 decoder.decode("".join(line))
-                print("------------------------------\n")
+                if args.no_separator == False:
+                    print("------------------------------\n")
 
     if len(args.hex) > 0:
         decoder.decode("".join(args.hex))
