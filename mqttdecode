@@ -230,13 +230,13 @@ class mqttdecode():
 
     def _get_output_v4(self):
         self._output_text_v4 = self._output_text
-        self._output_hex_v4 = self._output_hex
+        self._output_hex_v4 = self._output_hex.strip()
         self._output_text = ""
         self._output_hex = ""
 
     def _get_output_v5(self):
         self._output_text_v5 = self._output_text
-        self._output_hex_v5 = self._output_hex
+        self._output_hex_v5 = self._output_hex.strip()
         self._output_text = ""
         self._output_hex = ""
 
