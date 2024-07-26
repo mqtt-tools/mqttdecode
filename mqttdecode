@@ -285,21 +285,23 @@ class mqttdecode():
         return i32
 
 
-    def _decode_varint(self, col):
+    def _decode_varint(self, col, allowed_values=None):
         if self._rl <= 0:
             return self.errstr, 0
         mult = 1
         varint = 0
         vl = 0
+        output_hex = ""
         for i in range(0,4):
             if self._rl <= 0:
                 return self.errstr, vl
             try:
                 byte = self._packet[0]
                 self._packet = self._packet[1:]
-                self._output_hex += f"{col}{byte:02x}{self.cols['reset']} "
+                output_hex += f"{byte:02x}"
             except IndexError:
                 varint = self.errstr
+                self._output_hex += f"{self.cols['error']}{output_hex}{self.cols['reset']} "
                 return (varint, vl)
             self._rl -= 1
 
@@ -309,6 +311,11 @@ class mqttdecode():
             if byte & 128 == 0:
                 break
 
+        if allowed_values is not None and varint not in allowed_values:
+            col = self.cols['error']
+            pass
+
+        self._output_hex += f"{col}{output_hex}{self.cols['reset']} "
         return (varint, vl)
 
 
@@ -350,7 +357,7 @@ class mqttdecode():
             return
 
         while self._rl > 0 and pl > 0:
-            prop, vl = self._decode_varint(self.cols['proptype'])
+            prop, vl = self._decode_varint(self.cols['proptype'], allowed_properties[cmdname])
             pl -= vl
 
             if prop in allowed_properties[cmdname]:
