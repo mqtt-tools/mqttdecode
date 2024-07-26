@@ -725,6 +725,10 @@ class mqttdecode():
 
 
     def _decode_pubflow_v5(self, cmdname):
+        self._restore_state()
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}{cmdname} v5.0{self.cols['reset']}\n"
+        self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
         if self._packet is not None and len(self._packet) > 0:
@@ -736,7 +740,10 @@ class mqttdecode():
         self._get_output_v5()
 
 
-    def _decode_pubflow_v4(self):
+    def _decode_pubflow_v4(self, cmdname):
+        self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
+        self._output_text += f"Command:           {self.cols['command']}{cmdname} v3.1.1{self.cols['reset']}\n"
+        self._print_fixed_header(0x00)
         self._print_length(self._rl)
         self._decode_mid()
         self._decode_excess_bytes()
@@ -745,61 +752,33 @@ class mqttdecode():
 
     def _decode_puback(self):
         if self.args.force_spec is None or self.args.force_spec == 4:
-            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
-            self._output_text += f"Command:           {self.cols['command']}PUBACK v3.1.1{self.cols['reset']}\n"
-            self._print_fixed_header(0x00)
-            self._decode_pubflow_v4()
+            self._decode_pubflow_v4('PUBACK')
 
         if self.args.force_spec is None or self.args.force_spec == 5:
-            self._restore_state()
-            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
-            self._output_text += f"Command:           {self.cols['command']}PUBACK v5.0{self.cols['reset']}\n"
-            self._print_fixed_header(0x00)
             self._decode_pubflow_v5('PUBACK')
 
 
     def _decode_pubrec(self):
         if self.args.force_spec is None or self.args.force_spec == 4:
-            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
-            self._output_text += f"Command:           {self.cols['command']}PUBREC v3.1.1{self.cols['reset']}\n"
-            self._print_fixed_header(0x00)
-            self._decode_pubflow_v4()
+            self._decode_pubflow_v4('PUBREC')
 
         if self.args.force_spec is None or self.args.force_spec == 5:
-            self._restore_state()
-            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
-            self._output_text += f"Command:           {self.cols['command']}PUBREC v5.0{self.cols['reset']}\n"
-            self._print_fixed_header(0x00)
             self._decode_pubflow_v5('PUBREC')
 
 
     def _decode_pubrel(self):
         if self.args.force_spec is None or self.args.force_spec == 4:
-            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
-            self._output_text += f"Command:           {self.cols['command']}PUBREL v3.1.1{self.cols['reset']}\n"
-            self._print_fixed_header(0x00)
-            self._decode_pubflow_v4()
+            self._decode_pubflow_v4('PUBREL')
 
         if self.args.force_spec is None or self.args.force_spec == 5:
-            self._restore_state()
-            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
-            self._output_text += f"Command:           {self.cols['command']}PUBREL v5.0{self.cols['reset']}\n"
-            self._print_fixed_header(0x00)
             self._decode_pubflow_v5('PUBREL')
 
 
     def _decode_pubcomp(self):
         if self.args.force_spec is None or self.args.force_spec == 4:
-            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
-            self._output_text += f"Command:           {self.cols['command']}PUBCOMP v3.1.1{self.cols['reset']}\n"
-            self._print_fixed_header(0x00)
-            self._decode_pubflow_v4()
+            self._decode_pubflow_v4('PUBCOMP')
 
         if self.args.force_spec is None or self.args.force_spec == 5:
-            self._restore_state()
-            self._output_hex = f"{self.cols['command']}{self._hdr:02x}{self.cols['reset']} " + self._output_hex
-            self._output_text += f"Command:           {self.cols['command']}PUBCOMP v5.0{self.cols['reset']}\n"
-            self._print_fixed_header(0x00)
             self._decode_pubflow_v5('PUBCOMP')
 
 
