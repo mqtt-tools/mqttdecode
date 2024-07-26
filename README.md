@@ -34,7 +34,7 @@ file, arguments.
 ## Options
 
 ```
-usage: mqttdecoder [-h] [-s {4,5}] [--no-colour] [-f FILE] [hex ...]
+usage: mqttdecoder [-h] [-s {4,5}] [--colour | --no-colour] [-f FILE] [hex ...]
 ```
 
 ### Specification version
@@ -57,8 +57,11 @@ mqttdecode -s 5 f00100
 ### Coloured output
 
 By default, mqttdecode will use ANSI colour codes to highlight different parts
-of the packet to make it easier to understand. If you do not want to include
-these colour codes in the output, use `--no-colour`
+of the packet to make it easier to understand, if the output is a TTY and will
+not use colour if the output is not a TTY. If you want to override this
+behaviour, use `--colour` or `--no-colour`.
+
+Colour output is not available on Windows.
 
 ```
 mqttdecode --no-colour f00100

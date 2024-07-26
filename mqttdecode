@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import argparse
+import platform
 import struct
 import sys
 
@@ -127,27 +128,27 @@ class COLOURS():
         self._colourful = colourful
         self._colours = {
             'cleansession': ansi_br_cyan,
-            'clientid': ansi_br_cyan,
-            'command': ansi_yellow,
-            'dup': ansi_br_cyan,
-            'error': ansi_error,
-            'keepalive': ansi_br_cyan,
-            'length': ansi_br_magenta,
-            'mid': ansi_br_cyan,
-            'password': ansi_br_cyan,
-            'payload': ansi_br_blue,
-            'property': ansi_br_blue,
-            'proptype': ansi_br_br_cyan,
-            'protover': ansi_br_cyan,
-            'qos': ansi_br_cyan,
-            'rc': ansi_br_cyan,
-            'reset': ansi_reset,
-            'retain': ansi_br_cyan,
-            'strlen': ansi_br_yellow2,
-            'subopt': ansi_br_cyan,
-            'topic': ansi_br_yellow,
-            'username': ansi_br_cyan,
-            'will': ansi_br_blue,
+            'clientid':     ansi_br_cyan,
+            'command':      ansi_yellow,
+            'dup':          ansi_br_cyan,
+            'error':        ansi_error,
+            'keepalive':    ansi_br_cyan,
+            'length':       ansi_br_magenta,
+            'mid':          ansi_br_cyan,
+            'password':     ansi_br_cyan,
+            'payload':      ansi_br_blue,
+            'property':     ansi_br_blue,
+            'proptype':     ansi_br_br_cyan,
+            'protover':     ansi_br_cyan,
+            'qos':          ansi_br_cyan,
+            'rc':           ansi_br_cyan,
+            'reset':        ansi_reset,
+            'retain':       ansi_br_cyan,
+            'strlen':       ansi_br_yellow2,
+            'subopt':       ansi_br_cyan,
+            'topic':        ansi_br_yellow,
+            'username':     ansi_br_cyan,
+            'will':         ansi_br_blue,
         }
 
     def __getitem__(self, key):
@@ -159,7 +160,7 @@ class COLOURS():
 class mqttdecode():
     def __init__(self, args):
         self.args = args
-        self.cols = COLOURS(not args.no_colour)
+        self.cols = COLOURS(args.colour)
         self.errstr = f"{self.cols['error']}?{self.cols['reset']}"
 
     def decode(self, hexstring):
@@ -1088,9 +1089,14 @@ def get_args():
         choices=[4, 5],
         help="force MQTT protocol version to use: 4 (for v3.1.1), or 5 (for v5.0). Does not apply to CONNECT packets"
     )
-    parser.add_argument(
-        "--no-colour", action="store_true", default=False,
-        help="don't colourise the output"
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--colour", action="store_true", default=None,
+        help="colourise the output"
+    )
+    group.add_argument(
+        "--no-colour", action="store_true", default=None,
+        help="do not colourise the output"
     )
 
     parser.add_argument('-f', '--file', type=str, help='file to read strings from')
@@ -1098,8 +1104,18 @@ def get_args():
 
     return parser.parse_args()
 
+
 def check_args(args):
-    pass
+    if args.no_colour == True:
+        args.colour = False
+
+    if args.colour is None:
+        # Default to colour if a TTY and colour not explicitly set, otherwise turn off
+        args.colour = sys.stdout.isatty()
+
+    if platform.system() == 'Windows':
+        args.colour = False
+
 
 def main():
     args = get_args()
