@@ -1,7 +1,7 @@
 # mqttdecode
 
-This is a tool that attempts to convert hex strings representing MQTT packets
-into a human readable form.
+This is a tool that attempts to convert hex strings or files, or binary files
+representing MQTT packets into a human readable form.
 
 It handles multiple packets at once, displays results for different protocol
 versions, and highlights most protocol errors and malformed packets.
@@ -23,7 +23,7 @@ Stdin:
 echo 50020001 | mqttdecode
 ```
 
-File:
+Hex File:
 ```
 mqttdecode -f hexstrings.txt
 ```
@@ -31,10 +31,16 @@ mqttdecode -f hexstrings.txt
 If multiple input options are used, they are processed in the order: stdin,
 file, arguments.
 
+
+Binary File:
+```
+mqttdecode -b -f binarypacket.dat
+mqttdecode --binary -f binarypacket.dat
+```
 ## Options
 
 ```
-usage: mqttdecoder [-h] [-s {4,5}] [--colour | --no-colour] [--no-separator] [-f FILE] [hex ...]
+usage: mqttdecoder [-h] [-s {4,5}] [--colour | --no-colour] [--no-separator] [-b] [-f FILE] [hex ...]
 ```
 
 ### Specification version

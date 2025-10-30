@@ -1105,6 +1105,12 @@ def get_args():
         help="force MQTT protocol version to use: 4 (for v3.1.1), or 5 (for v5.0). Does not apply to CONNECT packets"
     )
     group = parser.add_mutually_exclusive_group()
+
+    parser.add_argument(
+        '-b', '--binary', action="store_true", default=False,
+        help="treat data as binary rather than hex. Expects --file"
+    )
+
     group.add_argument(
         "--colour", action="store_true", default=None,
         help="colourise the output"
@@ -1150,11 +1156,16 @@ def main():
                 print("------------------------------\n")
 
     if args.file is not None:
-        with open(args.file, "rt") as f:
-            for line in f:
-                decoder.decode("".join(line))
-                if args.no_separator == False:
-                    print("------------------------------\n")
+        if args.binary:
+            with open(args.file, "rb") as f:
+                data = f.read()
+            decoder.decode(data.hex())
+        else:
+            with open(args.file, "rt") as f:
+                for line in f:
+                    decoder.decode("".join(line))
+                    if args.no_separator == False:
+                        print("------------------------------\n")
 
     if len(args.hex) > 0:
         decoder.decode("".join(args.hex))
