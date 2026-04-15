@@ -247,11 +247,12 @@ class mqttdecode():
             byte = self._packet[0]
             self._output_hex += f"{col}{byte:02x}{self.cols['reset']} "
             self._packet = self._packet[1:]
+            self._rl -= 1
         except (IndexError, TypeError):
             byte = self.errstr
-            if len(self._packet) < 1:
+            if self._packet is not None and len(self._packet) < 1:
                 self._packet = None
-        self._rl -= 1
+                self._rl = 0
         return byte
 
 
@@ -262,11 +263,12 @@ class mqttdecode():
             i16 = struct.unpack('!H', self._packet[0:2])[0]
             self._output_hex += f"{col}{self._packet[0:2].hex()}{self.cols['reset']} "
             self._packet = self._packet[2:]
+            self._rl -= 2
         except (IndexError, struct.error, TypeError):
             i16 = self.errstr
-            if len(self._packet) < 2:
+            if self._packet is not None and len(self._packet) < 2:
                 self._packet = None
-        self._rl -= 2
+            self._rl = 0
         return i16
 
 
@@ -277,11 +279,12 @@ class mqttdecode():
             i32 = struct.unpack('!I', self._packet[0:4])[0]
             self._output_hex += f"{col}{self._packet[0:4].hex()}{self.cols['reset']} "
             self._packet = self._packet[4:]
+            self._rl -= 4
         except (IndexError, struct.error):
             i32 = self.errstr
-            if len(self._packet) < 4:
+            if self._packet is not None and len(self._packet) < 4:
                 self._packet = None
-        self._rl -= 4
+                self._rl = 0
         return i32
 
 
