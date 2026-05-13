@@ -709,7 +709,7 @@ class mqttdecode():
             qos = f"{self.cols['error']}3{self.cols['reset']}"
 
         self._output_text += f"Command:           {self.cols['command']}PUBLISH v5.0{self.cols['reset']}\n"
-        cmd = (self._hdr & 0xF0) >> 8
+        cmd = (self._hdr & 0xF0) >> 4
         flags = (self._hdr & 0x0F)
         self._output_hex = f"{self.cols['command']}{cmd:x}{self.cols['qos']}{flags:x}{self.cols['reset']} " + self._output_hex
         self._output_text += f"QoS:               {self.cols['qos']}{qos}{self.cols['reset']}\n"
