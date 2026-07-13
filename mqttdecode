@@ -1096,7 +1096,7 @@ class mqttdecode():
 
 def get_args():
     parser = argparse.ArgumentParser(
-        prog="mqttdecoder",
+        prog="mqttdecode",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Copyright (C) 2024 Roger Light\n\nDecode hex strings of MQTT packets into a human readable form",
         epilog="https://github.com/mqtt-tools/mqttdecode"

@@ -40,7 +40,7 @@ mqttdecode --binary -f binarypacket.dat
 ## Options
 
 ```
-usage: mqttdecoder [-h] [-s {4,5}] [--colour | --no-colour] [--no-separator] [-b] [-f FILE] [hex ...]
+usage: mqttdecode [-h] [-s {4,5}] [--colour | --no-colour] [--no-separator] [-b] [-f FILE] [hex ...]
 ```
 
 ### Specification version
